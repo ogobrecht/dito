@@ -1,0 +1,23 @@
+{
+  "name": "model",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ogobrecht/model.git"
+  },
+  "scripts": {
+    "watch": "chokidar src/*.* --initial --command \"npm run build\"",
+    "prebuild": "npx ploc --in src/MODEL.pks --out README.md",
+    "build": "node src/build.js",
+    "install": "echo exit | sqlplus -S /@playground @install.sql",
+    "uninstall": "echo exit | sqlplus -S /@playground @uninstall.sql"
+  },
+  "devDependencies": {
+    "chokidar-cli": "^3.0.0",
+    "glob": "^7.2.0",
+    "markdown-toc": "^1.2.0",
+    "npm-run-all": "^4.1.5",
+    "ploc": "^0.8.0"
+  }
+}
