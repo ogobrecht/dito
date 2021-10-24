@@ -18,6 +18,8 @@ This project is in an early stage - use it at your own risk...
 
 CHANGELOG
 
+- 0.2.1 (2021-10-24): Fix error on unknown tables, add elapsed time to output, reformat code
+- 0.2.0 (2021-10-23): Add a param for custom tab lists, improved docs
 - 0.1.0 (2021-10-22): Initial minimal version
 
 SIGNATURE
@@ -26,7 +28,7 @@ SIGNATURE
 package model authid current_user is
 
 c_name    constant varchar2 ( 30 byte ) := 'Oracle Data Model Utilities'        ;
-c_version constant varchar2 ( 10 byte ) := '0.2.0'                              ;
+c_version constant varchar2 ( 10 byte ) := '0.2.1'                              ;
 c_url     constant varchar2 ( 34 byte ) := 'https://github.com/ogobrecht/model' ;
 c_license constant varchar2 (  3 byte ) := 'MIT'                                ;
 c_author  constant varchar2 ( 15 byte ) := 'Ottmar Gobrecht'                    ;
@@ -54,7 +56,7 @@ Per default only mviews for some user_xxx tables are created - also see
 
 You can overwrite the default by provide your own data dictionary table list:
 
-EXAMPLE
+EXAMPLES
 
 ```sql
 -- log is written to serveroutput, so we enable it here
@@ -64,10 +66,19 @@ set serveroutput on
 exec model.create_dict_mviews;
 
 -- with custom data dictionary table list
-exec model.create_dict_mviews('all_tables, user_tables, user_tab_columns');
+exec model.create_dict_mviews('all_tables, all_tab_columns');
 
--- works also when you provide the resulting mviev names instead of the table names
-exec model.create_dict_mviews('all_tables_mv, user_tables_mv');
+-- works also when you provide the resulting mviev names instead
+-- of the table names or when you have line breaks in your list
+begin
+  model.create_dict_mviews('
+    all_tables_mv       ,
+    all_tab_columns_mv  ,
+    all_constraints_mv  ,
+    all_cons_columns_mv ,
+  ');
+end;
+/
 ```
 
 SIGNATURE
