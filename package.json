@@ -10,7 +10,7 @@
     "watch": "chokidar src/*.* --initial --command \"npm run build\"",
     "prebuild": "npx ploc --in src/MODEL.pks --out README.md",
     "build": "node src/build.js",
-    "install": "echo exit | sqlplus -S /@playground @install.sql",
+    "postbuild": "echo exit | sqlplus -S /@playground @install.sql",
     "uninstall": "echo exit | sqlplus -S /@playground @uninstall.sql"
   },
   "devDependencies": {
