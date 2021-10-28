@@ -14,7 +14,7 @@ prompt - Package MODEL (spec)
 create or replace package model authid current_user is
 
 c_name    constant varchar2 ( 30 byte ) := 'Oracle Data Model Utilities'        ;
-c_version constant varchar2 ( 10 byte ) := '0.2.1'                              ;
+c_version constant varchar2 ( 10 byte ) := '0.3.0'                              ;
 c_url     constant varchar2 ( 34 byte ) := 'https://github.com/ogobrecht/model' ;
 c_license constant varchar2 (  3 byte ) := 'MIT'                                ;
 c_author  constant varchar2 ( 15 byte ) := 'Ottmar Gobrecht'                    ;
@@ -40,6 +40,7 @@ This project is in an early stage - use it at your own risk...
 
 CHANGELOG
 
+- 0.3.0 (2021-10-28): New helper methods get_data_default_vc, get_search_condition_vc
 - 0.2.1 (2021-10-24): Fix error on unknown tables, add elapsed time to output, reformat code
 - 0.2.0 (2021-10-23): Add a param for custom tab lists, improved docs
 - 0.1.0 (2021-10-22): Initial minimal version
@@ -113,6 +114,8 @@ end;
 
 **/
 
+--------------------------------------------------------------------------------
+
 procedure refresh_dict_mviews (
   p_dict_tabs_list varchar2 default c_dict_tabs_list
 );
@@ -127,6 +130,8 @@ value here for the refresh.
 
 **/
 
+--------------------------------------------------------------------------------
+
 procedure drop_dict_mviews (
   p_dict_tabs_list varchar2 default c_dict_tabs_list
 );
@@ -140,6 +145,42 @@ If you created a custum set of mviews you should provide the same parameter
 value here for the drop.
 
 **/
+
+--------------------------------------------------------------------------------
+
+function get_data_default_vc (
+  p_dict_tab_name varchar2,
+  p_table_name    varchar2,
+  p_column_name   varchar2,
+  p_owner         varchar2 default user)
+  return varchar2;
+/**
+
+Convert the LONG column DATA_DEFAULT to varchar2(4000).
+
+Is used in `create_dict_mviews`. Works only for the dictionary tables
+USER_TAB_COLUMNS, USER_TAB_COLS, ALL_TAB_COLUMNS, ALL_TAB_COLS,
+USER_NESTED_TABLE_COLS, ALL_NESTED_TABLE_COLS.
+
+**/
+
+--------------------------------------------------------------------------------
+
+function get_search_condition_vc (
+  p_dict_tab_name   varchar2,
+  p_constraint_name varchar2,
+  p_owner           varchar2 default user)
+  return varchar2;
+/**
+
+Convert the LONG column SEARCH_CONDITION to varchar2(4000).
+
+Is used in `create_dict_mviews`. Works only for the dictionary_tables
+USER_CONSTRAINTS, ALL_CONSTRAINTS
+
+**/
+
+--------------------------------------------------------------------------------
 
 end model;
 /
@@ -186,27 +227,53 @@ begin
   v_table_name := lower(trim(substr(p_table_name, 1, 1000)));
   v_mview_name := v_table_name || '_mv';
   for i in (
-    select table_name, column_name, data_type, data_length
-      from all_tab_cols
-     where owner = 'SYS'
-       and table_name = upper(v_table_name)
-     order by column_id
+    with base as (
+      select table_name, column_name, data_type, data_length
+        from all_tab_cols
+       where owner = 'SYS'
+         and table_name = upper(v_table_name)
+       order by column_id
+    )
+    select table_name,
+           column_name,
+           data_type,
+           data_length,
+           case when data_type = 'LONG' then (
+             select count(*) 
+               from base 
+              where column_name = t.column_name || '_VC') 
+           end as vc_column_exists
+      from base t  
   )
   loop
     v_sql := v_sql || '  ' ||
-              case when i.data_type != 'LONG'
-                then lower(i.column_name)
-                else 'to_lob(' || lower(i.column_name) || ') as ' || lower(i.column_name)
-              end || ',' || chr(10);
+      case when i.data_type != 'LONG' then 
+        lower(i.column_name) || ',' || chr(10)
+        else 
+          'to_lob(' || lower(i.column_name) || ') as ' || lower(i.column_name) || ',' || chr(10) ||
+          case when i.vc_column_exists = 0 then 
+            case i.column_name
+              when 'DATA_DEFAULT' then 
+                '  case when data_default is not null then model.get_data_default_vc(p_dict_tab_name=>''' || v_table_name || 
+                  ''',p_table_name=>table_name,p_column_name=>column_name' || 
+                  case when v_table_name like 'all%' then ',p_owner=>owner' end || 
+                  ') end as ' || lower(i.column_name) || '_vc,' || chr(10)
+              when 'SEARCH_CONDITION' then 
+                '  case when search_condition is not null then model.get_search_conditions_vc(p_dict_tab_name=>''' || v_table_name || 
+                  ''',p_table_name=>table_name,p_constraint_name=>constraint_name,p_owner=>owner' ||
+                  ') end as ' || lower(i.column_name) || '_vc,' || chr(10)
+            end
+          end
+      end;
   end loop;
   if v_sql is not null then
     v_return := 1;
     v_sql    := 'create materialized view ' || v_mview_name || ' as ' || chr(10) ||
-                    'select'                                           || chr(10) ||
-                    rtrim(v_sql, ','  || chr(10))                      || chr(10) ||
-                    'from'                                             || chr(10) ||
+                    'select'                                          || chr(10) ||
+                    rtrim(v_sql, ',' || chr(10))                      || chr(10) ||
+                    'from'                                            || chr(10) ||
                     '  ' || v_table_name;
-    --dbms_output.put_line(v_sql);
+    dbms_output.put_line(v_sql);
     dbms_output.put_line('- ' || v_mview_name);
     execute immediate(v_sql);
   end if;
@@ -293,6 +360,73 @@ begin
   end loop;
   dbms_output.put_line('- ' || v_count || ' mview' || case when v_count != 1 then 's' end || ' dropped in ' || runtime(v_start));
 end drop_dict_mviews;
+
+--------------------------------------------------------------------------------
+
+function get_data_default_vc (
+  p_dict_tab_name varchar2,
+  p_table_name    varchar2,
+  p_column_name   varchar2,
+  p_owner         varchar2 default user)
+  return varchar2
+as
+  v_long long;
+begin
+  case
+    when upper(p_dict_tab_name) in ('USER_TAB_COLUMNS', 'USER_TAB_COLS') then
+      select data_default into v_long
+        from user_tab_columns
+       where table_name = upper(p_table_name)
+         and column_name = upper(p_column_name);
+    when upper(p_dict_tab_name) in ('ALL_TAB_COLUMNS', 'ALL_TAB_COLS') then
+      select data_default into v_long
+        from all_tab_columns
+       where owner = p_owner
+         and table_name = upper(p_table_name)
+         and column_name = upper(p_column_name);
+    when upper(p_dict_tab_name) = 'USER_NESTED_TABLE_COLS' then
+      select data_default into v_long
+        from user_nested_table_cols
+       where table_name = upper(p_table_name)
+         and column_name = upper(p_column_name);
+    when upper(p_dict_tab_name) = 'ALL_NESTED_TABLE_COLS' then
+      select data_default into v_long
+        from all_nested_table_cols
+       where owner = p_owner
+         and table_name = upper(p_table_name)
+         and column_name = upper(p_column_name);
+    else
+      raise_application_error(-20999, 'Unsupported dictionary table ' || p_dict_tab_name);
+  end case;
+  return substr(v_long, 1, 4000);
+end get_data_default_vc;
+
+--------------------------------------------------------------------------------
+
+function get_search_condition_vc (
+  p_dict_tab_name   varchar2,
+  p_constraint_name varchar2,
+  p_owner           varchar2 default user)
+  return varchar2
+as
+  v_long long;
+begin
+  case upper(p_dict_tab_name)
+    when 'USER_CONSTRAINTS' then
+      select search_condition into v_long
+        from user_constraints
+       where owner = p_owner
+         and constraint_name = upper(p_constraint_name);
+    when 'ALL_CONSTRAINTS' then
+      select search_condition into v_long
+        from all_constraints
+       where owner = p_owner
+         and constraint_name = upper(p_constraint_name);
+    else
+      raise_application_error(-20999, 'Unsupported dictionary table ' || p_dict_tab_name);
+  end case;
+  return substr(v_long, 1, 4000);
+end get_search_condition_vc;
 
 --------------------------------------------------------------------------------
 

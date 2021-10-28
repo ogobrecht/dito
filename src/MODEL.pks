@@ -1,7 +1,7 @@
 create or replace package model authid current_user is
 
 c_name    constant varchar2 ( 30 byte ) := 'Oracle Data Model Utilities'        ;
-c_version constant varchar2 ( 10 byte ) := '0.2.1'                              ;
+c_version constant varchar2 ( 10 byte ) := '0.3.0'                              ;
 c_url     constant varchar2 ( 34 byte ) := 'https://github.com/ogobrecht/model' ;
 c_license constant varchar2 (  3 byte ) := 'MIT'                                ;
 c_author  constant varchar2 ( 15 byte ) := 'Ottmar Gobrecht'                    ;
@@ -27,6 +27,7 @@ This project is in an early stage - use it at your own risk...
 
 CHANGELOG
 
+- 0.3.0 (2021-10-28): New helper methods get_data_default_vc, get_search_condition_vc
 - 0.2.1 (2021-10-24): Fix error on unknown tables, add elapsed time to output, reformat code
 - 0.2.0 (2021-10-23): Add a param for custom tab lists, improved docs
 - 0.1.0 (2021-10-22): Initial minimal version
@@ -100,6 +101,8 @@ end;
 
 **/
 
+--------------------------------------------------------------------------------
+
 procedure refresh_dict_mviews (
   p_dict_tabs_list varchar2 default c_dict_tabs_list
 );
@@ -114,6 +117,8 @@ value here for the refresh.
 
 **/
 
+--------------------------------------------------------------------------------
+
 procedure drop_dict_mviews (
   p_dict_tabs_list varchar2 default c_dict_tabs_list
 );
@@ -127,6 +132,42 @@ If you created a custum set of mviews you should provide the same parameter
 value here for the drop.
 
 **/
+
+--------------------------------------------------------------------------------
+
+function get_data_default_vc (
+  p_dict_tab_name varchar2,
+  p_table_name    varchar2,
+  p_column_name   varchar2,
+  p_owner         varchar2 default user)
+  return varchar2;
+/**
+
+Convert the LONG column DATA_DEFAULT to varchar2(4000).
+
+Is used in `create_dict_mviews`. Works only for the dictionary tables
+USER_TAB_COLUMNS, USER_TAB_COLS, ALL_TAB_COLUMNS, ALL_TAB_COLS,
+USER_NESTED_TABLE_COLS, ALL_NESTED_TABLE_COLS.
+
+**/
+
+--------------------------------------------------------------------------------
+
+function get_search_condition_vc (
+  p_dict_tab_name   varchar2,
+  p_constraint_name varchar2,
+  p_owner           varchar2 default user)
+  return varchar2;
+/**
+
+Convert the LONG column SEARCH_CONDITION to varchar2(4000).
+
+Is used in `create_dict_mviews`. Works only for the dictionary_tables
+USER_CONSTRAINTS, ALL_CONSTRAINTS
+
+**/
+
+--------------------------------------------------------------------------------
 
 end model;
 /
