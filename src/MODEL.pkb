@@ -85,7 +85,7 @@ begin
                     rtrim(v_sql, ',' || chr(10))                      || chr(10) ||
                     'from'                                            || chr(10) ||
                     '  ' || v_table_name;
-    dbms_output.put_line(v_sql);
+    --dbms_output.put_line(v_sql);
     dbms_output.put_line('- ' || v_mview_name);
     execute immediate(v_sql);
   end if;
