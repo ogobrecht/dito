@@ -8,38 +8,79 @@ set trimout on
 set trimspool on
 whenever sqlerror exit sql.sqlcode rollback
 
-prompt ORACLE DATA MODEL UTILITIES: CREATE DATABASE OBJECTS
-prompt - Project page https://github.com/ogobrecht/model
-prompt - Package MODEL (spec)
-create or replace package model authid current_user is
+prompt ORACLE DICTIONARY TOOLS: CREATE DATABASE OBJECTS
+prompt - Project page https://github.com/ogobrecht/dito
+-- select * from all_plsql_object_settings where name = 'DITO';
 
-c_name    constant varchar2 ( 30 byte ) := 'Oracle Data Model Utilities'        ;
-c_version constant varchar2 ( 10 byte ) := '0.3.0'                              ;
-c_url     constant varchar2 ( 34 byte ) := 'https://github.com/ogobrecht/model' ;
-c_license constant varchar2 (  3 byte ) := 'MIT'                                ;
-c_author  constant varchar2 ( 15 byte ) := 'Ottmar Gobrecht'                    ;
+prompt - Set compiler flags
+declare
+  v_apex_installed     varchar2(5) := 'FALSE'; -- Do not change (is set dynamically).
+  v_utils_public       varchar2(5) := 'FALSE'; -- Make utilities public available (for testing or other usages).
+  v_native_compilation boolean     := false;   -- Set this to true on your own risk (in the Oracle cloud you will get likely an "insufficient privileges" error)
+  v_count pls_integer;
+begin
 
-c_dict_tabs_list constant varchar2 (200 byte) := '
+  execute immediate 'alter session set plsql_warnings = ''enable:all,disable:5004,disable:6005,disable:6006,disable:6009,disable:6010,disable:6027,disable:7207''';
+  execute immediate 'alter session set plscope_settings = ''identifiers:all''';
+  execute immediate 'alter session set plsql_optimize_level = 3';
+
+  if v_native_compilation then
+    execute immediate 'alter session set plsql_code_type=''native''';
+  end if;
+
+  select count(*) into v_count from all_objects where object_type = 'SYNONYM' and object_name = 'APEX_EXPORT';
+  v_apex_installed := case when v_count = 0 then 'FALSE' else 'TRUE' end;
+
+  execute immediate 'alter session set plsql_ccflags = '''
+    || 'APEX_INSTALLED:' || v_apex_installed || ','
+    || 'UTILS_PUBLIC:'   || v_utils_public   || '''';
+
+end;
+/
+
+prompt - Package DITO (spec)
+create or replace package dito authid current_user is
+
+c_name    constant varchar2 ( 30 byte ) := 'Oracle Dictionary Tools'           ;
+c_version constant varchar2 ( 10 byte ) := '0.5.0'                             ;
+c_url     constant varchar2 ( 34 byte ) := 'https://github.com/ogobrecht/dito' ;
+c_license constant varchar2 (  3 byte ) := 'MIT'                               ;
+c_author  constant varchar2 ( 15 byte ) := 'Ottmar Gobrecht'                   ;
+
+c_dict_tabs_list constant varchar2 (1000 byte) := '
   user_tables         ,
   user_tab_columns    ,
   user_constraints    ,
   user_cons_columns   ,
+  user_indexes        ,
+  user_ind_columns    ,
   user_tab_comments   ,
   user_mview_comments ,
   user_col_comments   ,
+  all_tables          ,
+  all_tab_columns     ,
+  all_constraints     ,
+  all_cons_columns    ,
+  all_indexes         ,
+  all_ind_columns     ,
+  all_tab_comments    ,
+  all_mview_comments  ,
+  all_col_comments    ,
 ';
 
 /**
 
-Oracle Data Model Utilities
-===========================
+Oracle Dictionary Tools
+=======================
 
-PL/SQL utilities to support data model activities like reporting, visualizations...
+PL/SQL tools for the Oracle DB dictionary views...
 
 This project is in an early stage - use it at your own risk...
 
 CHANGELOG
 
+- 0.5.0 (2022-10-02): Rename package from MODEL to DITO (for DIctionary TOols), rework project structure
+- 0.4.0 (2022-03-05): New methods get_table_query and get_table_headers
 - 0.3.0 (2021-10-28): New helper methods get_data_default_vc, get_search_condition_vc
 - 0.2.1 (2021-10-24): Fix error on unknown tables, add elapsed time to output, reformat code
 - 0.2.0 (2021-10-23): Add a param for custom tab lists, improved docs
@@ -70,12 +111,11 @@ subtype t_16kb is varchar2 (16384 byte);
 subtype t_32kb is varchar2 (32767 byte);
 
 --------------------------------------------------------------------------------
--- PUBLIC MODEL METHODS
+-- PUBLIC DITO METHODS
 --------------------------------------------------------------------------------
 
 procedure create_dict_mviews (
-  p_dict_tabs_list varchar2 default c_dict_tabs_list
-);
+  p_dict_tabs_list in varchar2 default c_dict_tabs_list );
 /**
 
 Create materialized views for data dictionary tables.
@@ -94,15 +134,15 @@ EXAMPLES
 set serveroutput on
 
 -- with default data dictionary table list
-exec model.create_dict_mviews;
+exec dito.create_dict_mviews;
 
 -- with custom data dictionary table list
-exec model.create_dict_mviews('all_tables, all_tab_columns');
+exec dito.create_dict_mviews('all_tables, all_tab_columns');
 
 -- works also when you provide the resulting mviev names instead
 -- of the table names or when you have line breaks in your list
 begin
-  model.create_dict_mviews('
+  dito.create_dict_mviews('
     all_tables_mv       ,
     all_tab_columns_mv  ,
     all_constraints_mv  ,
@@ -117,8 +157,7 @@ end;
 --------------------------------------------------------------------------------
 
 procedure refresh_dict_mviews (
-  p_dict_tabs_list varchar2 default c_dict_tabs_list
-);
+  p_dict_tabs_list in varchar2 default c_dict_tabs_list );
 /**
 
 Refresh the materialized views.
@@ -133,8 +172,7 @@ value here for the refresh.
 --------------------------------------------------------------------------------
 
 procedure drop_dict_mviews (
-  p_dict_tabs_list varchar2 default c_dict_tabs_list
-);
+  p_dict_tabs_list in varchar2 default c_dict_tabs_list );
 /**
 
 Drop the materialized views.
@@ -149,11 +187,11 @@ value here for the drop.
 --------------------------------------------------------------------------------
 
 function get_data_default_vc (
-  p_dict_tab_name varchar2,
-  p_table_name    varchar2,
-  p_column_name   varchar2,
-  p_owner         varchar2 default user)
-  return varchar2;
+  p_dict_tab_name in varchar2,
+  p_table_name    in varchar2,
+  p_column_name   in varchar2,
+  p_owner         in varchar2 default user )
+ return varchar2;
 /**
 
 Convert the LONG column DATA_DEFAULT to varchar2(4000).
@@ -167,9 +205,9 @@ USER_NESTED_TABLE_COLS, ALL_NESTED_TABLE_COLS.
 --------------------------------------------------------------------------------
 
 function get_search_condition_vc (
-  p_dict_tab_name   varchar2,
-  p_constraint_name varchar2,
-  p_owner           varchar2 default user)
+  p_dict_tab_name   in varchar2,
+  p_constraint_name in varchar2,
+  p_owner           in varchar2 default user )
   return varchar2;
 /**
 
@@ -182,22 +220,80 @@ USER_CONSTRAINTS, ALL_CONSTRAINTS
 
 --------------------------------------------------------------------------------
 
-end model;
-/
+function get_table_query (
+  p_table_name  in varchar2,
+  p_schema_name in varchar2 default sys_context('USERENV', 'CURRENT_USER') )
+  return varchar2;
+/**
 
-prompt - Package MODEL (body)
-create or replace package body model is
+Get the query for a given table.
+
+**/
 
 --------------------------------------------------------------------------------
 
-function utl_cleanup_tabs_list(p_tabs_list varchar2) return varchar2 is
+function get_table_headers (
+  p_table_name  in varchar2,
+  p_schema_name in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+  p_delimiter   in varchar2 default ':',
+  p_lowercase   in boolean  default true )
+  return varchar2;
+/**
+
+Get the column headings for a given table as a delimited string.
+
+**/
+
+/*
+function get_table_heads_generic_cols (
+  p_table_name in varchar2 ,
+  p_delimiter  in varchar2 default ':',
+  p_lowercase  in boolean  default true )
+  return varchar2;
+
+Get the generic column headers for a given table as a delimited string .
+
+*/
+
+--------------------------------------------------------------------------------
+
+function version return varchar2;
+/**
+
+Returns the version information from the dito package.
+
+Inspired by [Steven's Live SQL example](https://livesql.oracle.com/apex/livesql/file/content_CBXGUSXSVIPRVUPZGJ0HGFQI0.html)
+
+```sql
+select dito.version from dual;
+```
+
+**/
+
+--------------------------------------------------------------------------------
+
+end dito;
+/
+
+prompt - Package DITO (body)
+create or replace package body dito is
+
+--------------------------------------------------------------------------------
+
+function utl_cleanup_tabs_list (
+  p_tabs_list in varchar2 )
+  return varchar2
+is
 begin
   return trim(both ',' from regexp_replace(regexp_replace(p_tabs_list, '\s+'), ',{2,}', ','));
 end;
 
 --------------------------------------------------------------------------------
 
-function runtime ( p_start in timestamp ) return varchar2 is
+function runtime (
+  p_start in timestamp )
+  return varchar2
+is
   v_runtime t_32b;
 begin
   v_runtime := to_char(localtimestamp - p_start);
@@ -206,7 +302,10 @@ end runtime;
 
 --------------------------------------------------------------------------------
 
-function utl_runtime_seconds ( p_start in timestamp ) return number is
+function utl_runtime_seconds (
+  p_start in timestamp )
+  return number
+is
   v_runtime interval day to second;
 begin
   v_runtime := localtimestamp - p_start;
@@ -218,7 +317,10 @@ end utl_runtime_seconds;
 
 --------------------------------------------------------------------------------
 
-function utl_create_dict_mview ( p_table_name varchar2 ) return integer is
+function utl_create_dict_mview (
+  p_table_name in varchar2 )
+  return integer
+is
   v_table_name t_1kb;
   v_mview_name t_1kb;
   v_sql        t_32kb;
@@ -239,27 +341,27 @@ begin
            data_type,
            data_length,
            case when data_type = 'LONG' then (
-             select count(*) 
-               from base 
-              where column_name = t.column_name || '_VC') 
+             select count(*)
+               from base
+              where column_name = t.column_name || '_VC')
            end as vc_column_exists
-      from base t  
+      from base t
   )
   loop
     v_sql := v_sql || '  ' ||
-      case when i.data_type != 'LONG' then 
+      case when i.data_type != 'LONG' then
         lower(i.column_name) || ',' || chr(10)
-        else 
+        else
           'to_lob(' || lower(i.column_name) || ') as ' || lower(i.column_name) || ',' || chr(10) ||
-          case when i.vc_column_exists = 0 then 
+          case when i.vc_column_exists = 0 then
             case i.column_name
-              when 'DATA_DEFAULT' then 
-                '  case when data_default is not null then model.get_data_default_vc(p_dict_tab_name=>''' || v_table_name || 
-                  ''',p_table_name=>table_name,p_column_name=>column_name' || 
-                  case when v_table_name like 'all%' then ',p_owner=>owner' end || 
+              when 'DATA_DEFAULT' then
+                '  case when data_default is not null then dito.get_data_default_vc(p_dict_tab_name=>''' || v_table_name ||
+                  ''',p_table_name=>table_name,p_column_name=>column_name' ||
+                  case when v_table_name like 'all%' then ',p_owner=>owner' end ||
                   ') end as ' || lower(i.column_name) || '_vc,' || chr(10)
-              when 'SEARCH_CONDITION' then 
-                '  case when search_condition is not null then model.get_search_conditions_vc(p_dict_tab_name=>''' || v_table_name || 
+              when 'SEARCH_CONDITION' then
+                '  case when search_condition is not null then dito.get_search_conditions_vc(p_dict_tab_name=>''' || v_table_name ||
                   ''',p_table_name=>table_name,p_constraint_name=>constraint_name,p_owner=>owner' ||
                   ') end as ' || lower(i.column_name) || '_vc,' || chr(10)
             end
@@ -282,12 +384,14 @@ end utl_create_dict_mview;
 
 --------------------------------------------------------------------------------
 
-procedure create_dict_mviews ( p_dict_tabs_list varchar2 default c_dict_tabs_list ) is
+procedure create_dict_mviews (
+  p_dict_tabs_list in varchar2 default c_dict_tabs_list )
+is
   v_start          timestamp := localtimestamp;
   v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
   v_count          t_int     := 0;
 begin
-  dbms_output.put_line('MODEL - CREATE DICT MVIEWS');
+  dbms_output.put_line('DITO - CREATE DICT MVIEWS');
   for i in (
     -- https://blogs.oracle.com/sql/post/split-comma-separated-values-into-rows-in-oracle-database
     with
@@ -310,12 +414,14 @@ end create_dict_mviews;
 
 --------------------------------------------------------------------------------
 
-procedure refresh_dict_mviews ( p_dict_tabs_list varchar2 default c_dict_tabs_list ) is
+procedure refresh_dict_mviews (
+  p_dict_tabs_list in varchar2 default c_dict_tabs_list )
+is
   v_start          timestamp := localtimestamp;
   v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
   v_count          t_int     := 0;
 begin
-  dbms_output.put_line('MODEL - REFRESH DICT MVIEWS');
+  dbms_output.put_line('DITO - REFRESH DICT MVIEWS');
   for i in (
     with
     base as ( select v_dict_tabs_list as str from dual ),
@@ -337,12 +443,14 @@ end refresh_dict_mviews;
 
 --------------------------------------------------------------------------------
 
-procedure drop_dict_mviews ( p_dict_tabs_list varchar2 default c_dict_tabs_list ) is
+procedure drop_dict_mviews (
+  p_dict_tabs_list in varchar2 default c_dict_tabs_list )
+is
   v_start          timestamp := localtimestamp;
   v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
   v_count          t_int     := 0;
 begin
-  dbms_output.put_line('MODEL - DROP DICT MVIEWS');
+  dbms_output.put_line('DITO - DROP DICT MVIEWS');
   for i in(
     with
     base as ( select v_dict_tabs_list as str from dual ),
@@ -369,7 +477,7 @@ function get_data_default_vc (
   p_column_name   varchar2,
   p_owner         varchar2 default user)
   return varchar2
-as
+is
   v_long long;
 begin
   case
@@ -404,11 +512,11 @@ end get_data_default_vc;
 --------------------------------------------------------------------------------
 
 function get_search_condition_vc (
-  p_dict_tab_name   varchar2,
-  p_constraint_name varchar2,
-  p_owner           varchar2 default user)
+  p_dict_tab_name   in varchar2,
+  p_constraint_name in varchar2,
+  p_owner           in varchar2 default user )
   return varchar2
-as
+is
   v_long long;
 begin
   case upper(p_dict_tab_name)
@@ -430,7 +538,109 @@ end get_search_condition_vc;
 
 --------------------------------------------------------------------------------
 
-end model;
+function get_table_query (
+  p_table_name  in varchar2,
+  p_schema_name in varchar2 default sys_context('USERENV', 'CURRENT_USER') )
+  return varchar2
+is
+  v_return varchar2( 32767 ) := 'select ';
+begin
+  for i in ( select *
+               from all_tab_columns
+              where owner      = p_schema_name
+                and table_name = p_table_name
+              order by column_id )
+  loop
+    v_return := v_return || i.column_name || ', ';
+  end loop;
+
+  return rtrim( v_return, ', ' ) || ' from ' || p_table_name;
+end get_table_query;
+
+--------------------------------------------------------------------------------
+
+function get_table_headers (
+  p_table_name  in varchar2,
+  p_schema_name in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+  p_delimiter   in varchar2 default ':',
+  p_lowercase   in boolean  default true )
+  return varchar2
+is
+  v_return varchar2(32767);
+begin
+  for i in ( select *
+               from all_tab_columns
+              where owner      = p_schema_name
+                and table_name = p_table_name
+              order by column_id )
+  loop
+    v_return := v_return ||
+                case
+                  when p_lowercase
+                  then lower( i.column_name )
+                  else i.column_name
+                end ||
+                p_delimiter;
+  end loop;
+
+  return rtrim( v_return, p_delimiter );
+end get_table_headers;
+
+--------------------------------------------------------------------------------
+
+function version return varchar2 is
+begin
+  return c_version;
+end version;
+
+--------------------------------------------------------------------------------
+
+end dito;
 /
-prompt - FINISHED
+-- check for errors in package dito
+declare
+  v_count pls_integer;
+begin
+  select count(*)
+    into v_count
+    from user_errors
+   where name = 'DITO';
+  if v_count > 0 then
+    dbms_output.put_line('- Package DITO has errors :-(');
+  end if;
+end;
+/
+
+column "Name"      format a15
+column "Line,Col"  format a10
+column "Type"      format a10
+column "Message"   format a80
+
+select name || case when type like '%BODY' then ' body' end as "Name",
+       line || ',' || position as "Line,Col",
+       attribute               as "Type",
+       text                    as "Message"
+  from user_errors
+ where name = 'DITO'
+ order by name, line, position;
+
+declare
+  v_count   pls_integer;
+  v_version varchar2(10 byte);
+begin
+  select count(*)
+    into v_count
+    from user_errors
+   where name = 'DITO';
+  if v_count = 0 then
+    -- without execute immediate this script will raise an error when the package dito is not valid
+    execute immediate 'select dito.version from dual' into v_version;
+    dbms_output.put_line('- FINISHED: v' || v_version);
+  end if;
+end;
+/
+prompt
+
+
+
 

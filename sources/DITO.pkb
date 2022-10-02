@@ -1,15 +1,21 @@
-create or replace package body model is
+create or replace package body dito is
 
 --------------------------------------------------------------------------------
 
-function utl_cleanup_tabs_list(p_tabs_list varchar2) return varchar2 is
+function utl_cleanup_tabs_list (
+  p_tabs_list in varchar2 )
+  return varchar2
+is
 begin
   return trim(both ',' from regexp_replace(regexp_replace(p_tabs_list, '\s+'), ',{2,}', ','));
 end;
 
 --------------------------------------------------------------------------------
 
-function runtime ( p_start in timestamp ) return varchar2 is
+function runtime (
+  p_start in timestamp )
+  return varchar2
+is
   v_runtime t_32b;
 begin
   v_runtime := to_char(localtimestamp - p_start);
@@ -18,7 +24,10 @@ end runtime;
 
 --------------------------------------------------------------------------------
 
-function utl_runtime_seconds ( p_start in timestamp ) return number is
+function utl_runtime_seconds (
+  p_start in timestamp )
+  return number
+is
   v_runtime interval day to second;
 begin
   v_runtime := localtimestamp - p_start;
@@ -30,7 +39,10 @@ end utl_runtime_seconds;
 
 --------------------------------------------------------------------------------
 
-function utl_create_dict_mview ( p_table_name varchar2 ) return integer is
+function utl_create_dict_mview (
+  p_table_name in varchar2 )
+  return integer
+is
   v_table_name t_1kb;
   v_mview_name t_1kb;
   v_sql        t_32kb;
@@ -51,27 +63,27 @@ begin
            data_type,
            data_length,
            case when data_type = 'LONG' then (
-             select count(*) 
-               from base 
-              where column_name = t.column_name || '_VC') 
+             select count(*)
+               from base
+              where column_name = t.column_name || '_VC')
            end as vc_column_exists
-      from base t  
+      from base t
   )
   loop
     v_sql := v_sql || '  ' ||
-      case when i.data_type != 'LONG' then 
+      case when i.data_type != 'LONG' then
         lower(i.column_name) || ',' || chr(10)
-        else 
+        else
           'to_lob(' || lower(i.column_name) || ') as ' || lower(i.column_name) || ',' || chr(10) ||
-          case when i.vc_column_exists = 0 then 
+          case when i.vc_column_exists = 0 then
             case i.column_name
-              when 'DATA_DEFAULT' then 
-                '  case when data_default is not null then model.get_data_default_vc(p_dict_tab_name=>''' || v_table_name || 
-                  ''',p_table_name=>table_name,p_column_name=>column_name' || 
-                  case when v_table_name like 'all%' then ',p_owner=>owner' end || 
+              when 'DATA_DEFAULT' then
+                '  case when data_default is not null then dito.get_data_default_vc(p_dict_tab_name=>''' || v_table_name ||
+                  ''',p_table_name=>table_name,p_column_name=>column_name' ||
+                  case when v_table_name like 'all%' then ',p_owner=>owner' end ||
                   ') end as ' || lower(i.column_name) || '_vc,' || chr(10)
-              when 'SEARCH_CONDITION' then 
-                '  case when search_condition is not null then model.get_search_conditions_vc(p_dict_tab_name=>''' || v_table_name || 
+              when 'SEARCH_CONDITION' then
+                '  case when search_condition is not null then dito.get_search_conditions_vc(p_dict_tab_name=>''' || v_table_name ||
                   ''',p_table_name=>table_name,p_constraint_name=>constraint_name,p_owner=>owner' ||
                   ') end as ' || lower(i.column_name) || '_vc,' || chr(10)
             end
@@ -94,12 +106,14 @@ end utl_create_dict_mview;
 
 --------------------------------------------------------------------------------
 
-procedure create_dict_mviews ( p_dict_tabs_list varchar2 default c_dict_tabs_list ) is
+procedure create_dict_mviews (
+  p_dict_tabs_list in varchar2 default c_dict_tabs_list )
+is
   v_start          timestamp := localtimestamp;
   v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
   v_count          t_int     := 0;
 begin
-  dbms_output.put_line('MODEL - CREATE DICT MVIEWS');
+  dbms_output.put_line('DITO - CREATE DICT MVIEWS');
   for i in (
     -- https://blogs.oracle.com/sql/post/split-comma-separated-values-into-rows-in-oracle-database
     with
@@ -122,12 +136,14 @@ end create_dict_mviews;
 
 --------------------------------------------------------------------------------
 
-procedure refresh_dict_mviews ( p_dict_tabs_list varchar2 default c_dict_tabs_list ) is
+procedure refresh_dict_mviews (
+  p_dict_tabs_list in varchar2 default c_dict_tabs_list )
+is
   v_start          timestamp := localtimestamp;
   v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
   v_count          t_int     := 0;
 begin
-  dbms_output.put_line('MODEL - REFRESH DICT MVIEWS');
+  dbms_output.put_line('DITO - REFRESH DICT MVIEWS');
   for i in (
     with
     base as ( select v_dict_tabs_list as str from dual ),
@@ -149,12 +165,14 @@ end refresh_dict_mviews;
 
 --------------------------------------------------------------------------------
 
-procedure drop_dict_mviews ( p_dict_tabs_list varchar2 default c_dict_tabs_list ) is
+procedure drop_dict_mviews (
+  p_dict_tabs_list in varchar2 default c_dict_tabs_list )
+is
   v_start          timestamp := localtimestamp;
   v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
   v_count          t_int     := 0;
 begin
-  dbms_output.put_line('MODEL - DROP DICT MVIEWS');
+  dbms_output.put_line('DITO - DROP DICT MVIEWS');
   for i in(
     with
     base as ( select v_dict_tabs_list as str from dual ),
@@ -181,7 +199,7 @@ function get_data_default_vc (
   p_column_name   varchar2,
   p_owner         varchar2 default user)
   return varchar2
-as
+is
   v_long long;
 begin
   case
@@ -216,11 +234,11 @@ end get_data_default_vc;
 --------------------------------------------------------------------------------
 
 function get_search_condition_vc (
-  p_dict_tab_name   varchar2,
-  p_constraint_name varchar2,
-  p_owner           varchar2 default user)
+  p_dict_tab_name   in varchar2,
+  p_constraint_name in varchar2,
+  p_owner           in varchar2 default user )
   return varchar2
-as
+is
   v_long long;
 begin
   case upper(p_dict_tab_name)
@@ -242,5 +260,62 @@ end get_search_condition_vc;
 
 --------------------------------------------------------------------------------
 
-end model;
+function get_table_query (
+  p_table_name  in varchar2,
+  p_schema_name in varchar2 default sys_context('USERENV', 'CURRENT_USER') )
+  return varchar2
+is
+  v_return varchar2( 32767 ) := 'select ';
+begin
+  for i in ( select *
+               from all_tab_columns
+              where owner      = p_schema_name
+                and table_name = p_table_name
+              order by column_id )
+  loop
+    v_return := v_return || i.column_name || ', ';
+  end loop;
+
+  return rtrim( v_return, ', ' ) || ' from ' || p_table_name;
+end get_table_query;
+
+--------------------------------------------------------------------------------
+
+function get_table_headers (
+  p_table_name  in varchar2,
+  p_schema_name in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+  p_delimiter   in varchar2 default ':',
+  p_lowercase   in boolean  default true )
+  return varchar2
+is
+  v_return varchar2(32767);
+begin
+  for i in ( select *
+               from all_tab_columns
+              where owner      = p_schema_name
+                and table_name = p_table_name
+              order by column_id )
+  loop
+    v_return := v_return ||
+                case
+                  when p_lowercase
+                  then lower( i.column_name )
+                  else i.column_name
+                end ||
+                p_delimiter;
+  end loop;
+
+  return rtrim( v_return, p_delimiter );
+end get_table_headers;
+
+--------------------------------------------------------------------------------
+
+function version return varchar2 is
+begin
+  return c_version;
+end version;
+
+--------------------------------------------------------------------------------
+
+end dito;
 /

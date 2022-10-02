@@ -7,7 +7,7 @@ set trimout on
 set trimspool on
 whenever sqlerror exit sql.sqlcode rollback
 
-prompt ORACLE DATA MODEL UTILITIES: DROP DATABASE OBJECTS
+prompt ORACLE DICTIONARY TOOLS: DROP DATABASE OBJECTS
 
 declare
   v_count        pls_integer;
@@ -20,7 +20,7 @@ begin
     select 'drop ' || lower(object_type) || ' ' || object_name as ddl
       from user_objects
      where object_type = 'PACKAGE BODY'
-       and object_name = 'MODEL'
+       and object_name = 'DITO'
   ) loop
     dbms_output.put_line('- ' || i.ddl || ';');
     execute immediate i.ddl;
@@ -32,7 +32,7 @@ begin
     select 'drop ' || lower(object_type) || ' ' || object_name as ddl
       from user_objects
      where object_type = 'PACKAGE'
-       and object_name = 'MODEL'
+       and object_name = 'DITO'
   ) loop
     dbms_output.put_line('- ' || i.ddl || ';');
     execute immediate i.ddl;
