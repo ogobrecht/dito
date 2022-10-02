@@ -43,7 +43,7 @@ create or replace package dito authid current_user is
 
 c_name    constant varchar2 ( 30 byte ) := 'Oracle Dictionary Tools'           ;
 c_version constant varchar2 ( 10 byte ) := '0.5.0'                             ;
-c_url     constant varchar2 ( 34 byte ) := 'https://github.com/ogobrecht/dito' ;
+c_url     constant varchar2 ( 33 byte ) := 'https://github.com/ogobrecht/dito' ;
 c_license constant varchar2 (  3 byte ) := 'MIT'                               ;
 c_author  constant varchar2 ( 15 byte ) := 'Ottmar Gobrecht'                   ;
 
@@ -73,7 +73,7 @@ c_dict_tabs_list constant varchar2 (1000 byte) := '
 Oracle Dictionary Tools
 =======================
 
-PL/SQL tools for the Oracle DB dictionary views...
+PL/SQL tools around the Oracle DB dictionary...
 
 This project is in an early stage - use it at your own risk...
 
