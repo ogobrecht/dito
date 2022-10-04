@@ -9,7 +9,7 @@ begin
   if v_count = 0 then
     -- without execute immediate this script will raise an error when the package dito is not valid
     execute immediate 'select dito.version from dual' into v_version;
-    dbms_output.put_line('- FINISHED: v' || v_version);
+    dbms_output.put_line('- FINISHED (v' || v_version || ')');
   end if;
 end;
 /

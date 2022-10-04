@@ -8,7 +8,7 @@ set trimout on
 set trimspool on
 whenever sqlerror exit sql.sqlcode rollback
 
-prompt ORACLE DICTIONARY TOOLS: CREATE DATABASE OBJECTS
+prompt ORACLE DICTIONARY TOOLS - CREATE CORE PACKAGE
 prompt - Project page https://github.com/ogobrecht/dito
 -- select * from all_plsql_object_settings where name = 'DITO';
 
@@ -38,14 +38,14 @@ begin
 end;
 /
 
-prompt - Package DITO (spec)
+prompt - Package dito (spec)
 create or replace package dito authid current_user is
 
-c_name    constant varchar2 ( 30 byte ) := 'Oracle Dictionary Tools'           ;
-c_version constant varchar2 ( 10 byte ) := '0.5.0'                             ;
-c_url     constant varchar2 ( 33 byte ) := 'https://github.com/ogobrecht/dito' ;
-c_license constant varchar2 (  3 byte ) := 'MIT'                               ;
-c_author  constant varchar2 ( 15 byte ) := 'Ottmar Gobrecht'                   ;
+c_name    constant varchar2 (30 byte) := 'Oracle Dictionary Tools';
+c_version constant varchar2 (10 byte) := '0.5.0';
+c_url     constant varchar2 (33 byte) := 'https://github.com/ogobrecht/dito';
+c_license constant varchar2 ( 3 byte) := 'MIT';
+c_author  constant varchar2 (15 byte) := 'Ottmar Gobrecht';
 
 c_dict_tabs_list constant varchar2 (1000 byte) := '
   user_tables         ,
@@ -79,7 +79,7 @@ This project is in an early stage - use it at your own risk...
 
 CHANGELOG
 
-- 0.5.0 (2022-10-02): Rename package from MODEL to DITO (for DIctionary TOols), rework project structure
+- 0.5.0 (2022-10-02): Rename package from model to dito, rework project structure
 - 0.4.0 (2022-03-05): New methods get_table_query and get_table_headers
 - 0.3.0 (2021-10-28): New helper methods get_data_default_vc, get_search_condition_vc
 - 0.2.1 (2021-10-24): Fix error on unknown tables, add elapsed time to output, reformat code
@@ -87,28 +87,6 @@ CHANGELOG
 - 0.1.0 (2021-10-22): Initial minimal version
 
 **/
-
---------------------------------------------------------------------------------
--- PUBLIC SIMPLE TYPES
---------------------------------------------------------------------------------
-
-subtype t_int  is pls_integer;
-subtype t_1b   is varchar2 (    1 byte);
-subtype t_2b   is varchar2 (    2 byte);
-subtype t_4b   is varchar2 (    4 byte);
-subtype t_8b   is varchar2 (    8 byte);
-subtype t_16b  is varchar2 (   16 byte);
-subtype t_32b  is varchar2 (   32 byte);
-subtype t_64b  is varchar2 (   64 byte);
-subtype t_128b is varchar2 (  128 byte);
-subtype t_256b is varchar2 (  256 byte);
-subtype t_512b is varchar2 (  512 byte);
-subtype t_1kb  is varchar2 ( 1024 byte);
-subtype t_2kb  is varchar2 ( 2048 byte);
-subtype t_4kb  is varchar2 ( 4096 byte);
-subtype t_8kb  is varchar2 ( 8192 byte);
-subtype t_16kb is varchar2 (16384 byte);
-subtype t_32kb is varchar2 (32767 byte);
 
 --------------------------------------------------------------------------------
 -- PUBLIC DITO METHODS
@@ -194,7 +172,7 @@ function get_data_default_vc (
  return varchar2;
 /**
 
-Convert the LONG column DATA_DEFAULT to varchar2(4000).
+Returns the LONG column DATA_DEFAULT as varchar2(4000).
 
 Is used in `create_dict_mviews`. Works only for the dictionary tables
 USER_TAB_COLUMNS, USER_TAB_COLS, ALL_TAB_COLUMNS, ALL_TAB_COLS,
@@ -211,7 +189,7 @@ function get_search_condition_vc (
   return varchar2;
 /**
 
-Convert the LONG column SEARCH_CONDITION to varchar2(4000).
+Returns the LONG column SEARCH_CONDITION as varchar2(4000).
 
 Is used in `create_dict_mviews`. Works only for the dictionary_tables
 USER_CONSTRAINTS, ALL_CONSTRAINTS
@@ -262,8 +240,6 @@ function version return varchar2;
 
 Returns the version information from the dito package.
 
-Inspired by [Steven's Live SQL example](https://livesql.oracle.com/apex/livesql/file/content_CBXGUSXSVIPRVUPZGJ0HGFQI0.html)
-
 ```sql
 select dito.version from dual;
 ```
@@ -275,7 +251,7 @@ select dito.version from dual;
 end dito;
 /
 
-prompt - Package DITO (body)
+prompt - Package dito (body)
 create or replace package body dito is
 
 --------------------------------------------------------------------------------
@@ -294,7 +270,7 @@ function runtime (
   p_start in timestamp )
   return varchar2
 is
-  v_runtime t_32b;
+  v_runtime varchar2(30 byte);
 begin
   v_runtime := to_char(localtimestamp - p_start);
   return substr(v_runtime, instr(v_runtime,':')-2, 15);
@@ -321,10 +297,10 @@ function utl_create_dict_mview (
   p_table_name in varchar2 )
   return integer
 is
-  v_table_name t_1kb;
-  v_mview_name t_1kb;
-  v_sql        t_32kb;
-  v_return     t_int := 0;
+  v_table_name varchar2(1000 byte);
+  v_mview_name varchar2(1000 byte);
+  v_sql        varchar2(32767 byte);
+  v_return     pls_integer := 0;
 begin
   v_table_name := lower(trim(substr(p_table_name, 1, 1000)));
   v_mview_name := v_table_name || '_mv';
@@ -388,8 +364,8 @@ procedure create_dict_mviews (
   p_dict_tabs_list in varchar2 default c_dict_tabs_list )
 is
   v_start          timestamp := localtimestamp;
-  v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
-  v_count          t_int     := 0;
+  v_dict_tabs_list varchar2(32767 byte)    := utl_cleanup_tabs_list(p_dict_tabs_list);
+  v_count          pls_integer     := 0;
 begin
   dbms_output.put_line('DITO - CREATE DICT MVIEWS');
   for i in (
@@ -417,9 +393,9 @@ end create_dict_mviews;
 procedure refresh_dict_mviews (
   p_dict_tabs_list in varchar2 default c_dict_tabs_list )
 is
-  v_start          timestamp := localtimestamp;
-  v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
-  v_count          t_int     := 0;
+  v_start          timestamp            := localtimestamp;
+  v_dict_tabs_list varchar2(32767 byte) := utl_cleanup_tabs_list(p_dict_tabs_list);
+  v_count          pls_integer          := 0;
 begin
   dbms_output.put_line('DITO - REFRESH DICT MVIEWS');
   for i in (
@@ -446,9 +422,9 @@ end refresh_dict_mviews;
 procedure drop_dict_mviews (
   p_dict_tabs_list in varchar2 default c_dict_tabs_list )
 is
-  v_start          timestamp := localtimestamp;
-  v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
-  v_count          t_int     := 0;
+  v_start          timestamp            := localtimestamp;
+  v_dict_tabs_list varchar2(32767 byte) := utl_cleanup_tabs_list(p_dict_tabs_list);
+  v_count          pls_integer          := 0;
 begin
   dbms_output.put_line('DITO - DROP DICT MVIEWS');
   for i in(
@@ -635,7 +611,7 @@ begin
   if v_count = 0 then
     -- without execute immediate this script will raise an error when the package dito is not valid
     execute immediate 'select dito.version from dual' into v_version;
-    dbms_output.put_line('- FINISHED: v' || v_version);
+    dbms_output.put_line('- FINISHED (v' || v_version || ')');
   end if;
 end;
 /

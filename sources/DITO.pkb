@@ -16,7 +16,7 @@ function runtime (
   p_start in timestamp )
   return varchar2
 is
-  v_runtime t_32b;
+  v_runtime varchar2(30 byte);
 begin
   v_runtime := to_char(localtimestamp - p_start);
   return substr(v_runtime, instr(v_runtime,':')-2, 15);
@@ -43,10 +43,10 @@ function utl_create_dict_mview (
   p_table_name in varchar2 )
   return integer
 is
-  v_table_name t_1kb;
-  v_mview_name t_1kb;
-  v_sql        t_32kb;
-  v_return     t_int := 0;
+  v_table_name varchar2(1000 byte);
+  v_mview_name varchar2(1000 byte);
+  v_sql        varchar2(32767 byte);
+  v_return     pls_integer := 0;
 begin
   v_table_name := lower(trim(substr(p_table_name, 1, 1000)));
   v_mview_name := v_table_name || '_mv';
@@ -110,8 +110,8 @@ procedure create_dict_mviews (
   p_dict_tabs_list in varchar2 default c_dict_tabs_list )
 is
   v_start          timestamp := localtimestamp;
-  v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
-  v_count          t_int     := 0;
+  v_dict_tabs_list varchar2(32767 byte)    := utl_cleanup_tabs_list(p_dict_tabs_list);
+  v_count          pls_integer     := 0;
 begin
   dbms_output.put_line('DITO - CREATE DICT MVIEWS');
   for i in (
@@ -139,9 +139,9 @@ end create_dict_mviews;
 procedure refresh_dict_mviews (
   p_dict_tabs_list in varchar2 default c_dict_tabs_list )
 is
-  v_start          timestamp := localtimestamp;
-  v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
-  v_count          t_int     := 0;
+  v_start          timestamp            := localtimestamp;
+  v_dict_tabs_list varchar2(32767 byte) := utl_cleanup_tabs_list(p_dict_tabs_list);
+  v_count          pls_integer          := 0;
 begin
   dbms_output.put_line('DITO - REFRESH DICT MVIEWS');
   for i in (
@@ -168,9 +168,9 @@ end refresh_dict_mviews;
 procedure drop_dict_mviews (
   p_dict_tabs_list in varchar2 default c_dict_tabs_list )
 is
-  v_start          timestamp := localtimestamp;
-  v_dict_tabs_list t_32kb    := utl_cleanup_tabs_list(p_dict_tabs_list);
-  v_count          t_int     := 0;
+  v_start          timestamp            := localtimestamp;
+  v_dict_tabs_list varchar2(32767 byte) := utl_cleanup_tabs_list(p_dict_tabs_list);
+  v_count          pls_integer          := 0;
 begin
   dbms_output.put_line('DITO - DROP DICT MVIEWS');
   for i in(

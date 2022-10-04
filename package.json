@@ -10,8 +10,8 @@
     "watch": "chokidar sources/*.* --initial --command \"npm run build\"",
     "prebuild": "npx ploc --in sources/DITO.pks --out README.md",
     "build": "node sources/build.js",
-    "postbuild": "echo exit | sqlplus -S /@playground @install/create_database_objects.sql",
-    "uninstall": "echo exit | sqlplus -S /@playground @uninstall/drop_database_objects.sql"
+    "postbuild": "echo exit | sqlplus -S /@playground @install/core.sql && echo exit | sqlplus -S /@playground @install/apex_extension.sql",
+    "uninstall": "echo exit | sqlplus -S /@playground @uninstall/dito_packages.sql"
   },
   "devDependencies": {
     "chokidar-cli": "^3.0.0",
