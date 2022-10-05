@@ -17,6 +17,13 @@ Get the query for a given table.
 This prepares also APEX session state for the conditional display of generic
 columns.
 
+EXAMPLE
+
+```sql
+select dito_apex.get_table_query(p_table_name => 'CONSOLE_LOGS')
+  from dual;
+```
+
 **/
 
 --------------------------------------------------------------------------------

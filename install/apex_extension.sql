@@ -60,6 +60,13 @@ Get the query for a given table.
 This prepares also APEX session state for the conditional display of generic
 columns.
 
+EXAMPLE
+
+```sql
+select dito_apex.get_table_query(p_table_name => 'CONSOLE_LOGS')
+  from dual;
+```
+
 **/
 
 --------------------------------------------------------------------------------
@@ -106,30 +113,33 @@ is
             case
                 when i.data_type in ('CHAR', 'VARCHAR2') then
                     v_count_vc := v_count_vc + 1;
-                    v_generic_column := 'VC' || lpad(to_char(v_count_vc), '0', 3);
+                    v_generic_column := 'VC' || lpad(to_char(v_count_vc), 3, '0');
 
                 when i.data_type in ('NUMBER', 'FLOAT') then
                     v_count_n := v_count_n + 1;
-                    v_generic_column := 'N' || lpad(to_char(v_count_n), '0', 3);
+                    v_generic_column := 'N' || lpad(to_char(v_count_n), 3, '0');
 
                 when i.data_type = 'DATE' then
                     v_count_d := v_count_d + 1;
-                    v_generic_column := 'D' || lpad(to_char(v_count_d), '0', 3);
+                    v_generic_column := 'D' || lpad(to_char(v_count_d), 3, '0');
 
                 when i.data_type like 'TIMESTAMP% WITH LOCAL TIME ZONE' then
                     v_count_tsltz := v_count_tsltz + 1;
-                    v_generic_column := 'TSLTZ' || lpad(to_char(v_count_tsltz), '0', 3);
+                    v_generic_column := 'TSLTZ' || lpad(to_char(v_count_tsltz), 3, '0');
 
                 when i.data_type like 'TIMESTAMP% WITH TIME ZONE' then
                     v_count_tstz := v_count_tstz + 1;
-                    v_generic_column := 'TSTZ' || lpad(to_char(v_count_tstz), '0', 3);
+                    v_generic_column := 'TSTZ' || lpad(to_char(v_count_tstz), 3, '0');
 
                 when i.data_type like 'TIMESTAMP%' then
                     v_count_ts := v_count_ts + 1;
-                    v_generic_column := 'TS' || lpad(to_char(v_count_ts), '0', 3);
+                    v_generic_column := 'TS' || lpad(to_char(v_count_ts), 3, '0');
+
+                else null;
             end case;
 
-            v_return := v_return || v_column_indent || i.column_name || ' as ' || v_generic_column || v_sep;
+            v_return := v_return || v_column_indent || i.column_name ||
+                        ' as ' || v_generic_column || v_sep;
 
             apex_util.set_session_state (
                 p_name  => v_generic_column,
@@ -140,7 +150,7 @@ is
     procedure fill_up_generic_columns (
         p_type in varchar2 )
     is
-        v_count pls_integer;
+        v_count pls_integer := 0;
     begin
         v_count := case p_type
                         when 'VC'    then v_count_vc
@@ -152,23 +162,30 @@ is
                    end + 1;
 
         for i in v_count .. p_max_cols_varchar loop
-            v_generic_column := p_type || lpad(to_char(v_count_vc), '0', 3);
-            v_return         := v_return || v_column_indent || ' null as ' || v_generic_column || v_sep;
+            v_generic_column := p_type || lpad(to_char(i), 3, '0');
+
+            v_return         := v_return || v_column_indent ||
+                                'null as ' || v_generic_column || v_sep;
+
             apex_util.set_session_state (
                 p_name  => v_generic_column,
                 p_value => null );
-        end loop; -- FIXME: implement
+        end loop;
     end fill_up_generic_columns;
+    ----------------------------------------
 begin
     process_table_columns;
+
     fill_up_generic_columns(p_type => 'VC'   );
     fill_up_generic_columns(p_type => 'N'    );
     fill_up_generic_columns(p_type => 'D'    );
     fill_up_generic_columns(p_type => 'TS'   );
     fill_up_generic_columns(p_type => 'TSTZ' );
     fill_up_generic_columns(p_type => 'TSLTZ');
-    v_return := 'select ' || rtrim( v_return, v_sep ) || chr(10) ||
+
+    v_return := 'select ' || rtrim( ltrim(v_return), v_sep ) || chr(10) ||
                 '  from ' || p_schema_name || '.' || p_table_name;
+
     return v_return;
 end get_table_query;
 
