@@ -8,11 +8,11 @@ set trimout on
 set trimspool on
 whenever sqlerror exit sql.sqlcode rollback
 
-exec dito.create_dict_mviews('all_tab_columns');
+exec model.create_dict_mviews('all_tab_columns');
 prompt
-prompt ORACLE DICTIONARY TOOLS - CREATE APEX EXTENSION PACKAGE
-prompt - Project page https://github.com/ogobrecht/dito
--- select * from all_plsql_object_settings where name = 'DITO';
+prompt ORACLE DATA MODEL UTILITIES - CREATE APEX EXTENSION PACKAGE
+prompt - Project page https://github.com/ogobrecht/model
+-- select * from all_plsql_object_settings where name = 'MODEL';
 
 prompt - Set compiler flags
 declare
@@ -40,19 +40,29 @@ begin
 end;
 /
 
-prompt - Package dito_apex (spec)
-create or replace package dito_apex authid current_user is
+prompt - Package model_joel (spec)
+create or replace package model_joel authid current_user is
+
+/**
+
+Oracle Data Model Utilities - APEX Extension
+============================================
+
+Helpers to support a generic Interactive Report to show the data of all
+tables.
+
+**/
 
 function get_table_query (
-  p_table_name             in varchar2,
-  p_schema_name            in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
-  p_max_cols_varchar       in integer default 20,
-  p_max_cols_number        in integer default 20,
-  p_max_cols_date          in integer default 20,
-  p_max_cols_timestamp     in integer default 20,
-  p_max_cols_timestamp_tz  in integer default 20,
-  p_max_cols_timestamp_ltz in integer default 20 )
-  return varchar2;
+    p_table_name             in varchar2,
+    p_schema_name            in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+    p_max_cols_varchar       in integer default 20,
+    p_max_cols_number        in integer default 20,
+    p_max_cols_date          in integer default 20,
+    p_max_cols_timestamp     in integer default 20,
+    p_max_cols_timestamp_tz  in integer default 20,
+    p_max_cols_timestamp_ltz in integer default 20 )
+    return varchar2;
 /**
 
 Get the query for a given table.
@@ -63,7 +73,7 @@ columns.
 EXAMPLE
 
 ```sql
-select dito_apex.get_table_query(p_table_name => 'CONSOLE_LOGS')
+select model_joel.get_table_query(p_table_name => 'CONSOLE_LOGS')
   from dual;
 ```
 
@@ -71,11 +81,11 @@ select dito_apex.get_table_query(p_table_name => 'CONSOLE_LOGS')
 
 --------------------------------------------------------------------------------
 
-end dito_apex;
+end model_joel;
 /
 
-prompt - Package dito_apex (body)
-create or replace package body dito_apex is
+prompt - Package model_joel (body)
+create or replace package body model_joel is
 
 --------------------------------------------------------------------------------
 
@@ -100,7 +110,9 @@ is
     v_count_ts       number      := 0;
     v_count_tstz     number      := 0;
     v_count_tsltz    number      := 0;
+
     ----------------------------------------
+
     procedure process_table_columns is
     begin
         for i in ( select column_name,
@@ -146,7 +158,9 @@ is
                 p_value => initcap(replace(i.column_name, '_', ' ')) );
         end loop;
     end process_table_columns;
+
     ----------------------------------------
+
     procedure fill_up_generic_columns (
         p_type in varchar2 )
     is
@@ -172,7 +186,9 @@ is
                 p_value => null );
         end loop;
     end fill_up_generic_columns;
+
     ----------------------------------------
+
 begin
     process_table_columns;
 
@@ -191,18 +207,18 @@ end get_table_query;
 
 --------------------------------------------------------------------------------
 
-end dito_apex;
+end model_joel;
 /
--- check for errors in package dito_apex
+-- check for errors in package model_joel
 declare
   v_count pls_integer;
 begin
   select count(*)
     into v_count
     from user_errors
-   where name = 'DITO_APEX';
+   where name = 'MODEL_JOEL';
   if v_count > 0 then
-    dbms_output.put_line('- Package DITO_APEX has errors :-(');
+    dbms_output.put_line('- Package MODEL_JOEL has errors :-(');
   end if;
 end;
 /
@@ -217,7 +233,7 @@ select name || case when type like '%BODY' then ' body' end as "Name",
        attribute               as "Type",
        text                    as "Message"
   from user_errors
- where name = 'DITO_APEX'
+ where name = 'MODEL_JOEL'
  order by name, line, position;
 
 prompt - FINISHED

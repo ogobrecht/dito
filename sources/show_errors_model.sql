@@ -1,13 +1,13 @@
--- check for errors in package dito_apex
+-- check for errors in package model
 declare
   v_count pls_integer;
 begin
   select count(*)
     into v_count
     from user_errors
-   where name = 'DITO_APEX';
+   where name = 'MODEL';
   if v_count > 0 then
-    dbms_output.put_line('- Package DITO_APEX has errors :-(');
+    dbms_output.put_line('- Package MODEL has errors :-(');
   end if;
 end;
 /
@@ -22,5 +22,5 @@ select name || case when type like '%BODY' then ' body' end as "Name",
        attribute               as "Type",
        text                    as "Message"
   from user_errors
- where name = 'DITO_APEX'
+ where name = 'MODEL'
  order by name, line, position;

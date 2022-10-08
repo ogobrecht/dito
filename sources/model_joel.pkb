@@ -1,4 +1,4 @@
-create or replace package body dito_apex is
+create or replace package body model_joel is
 
 --------------------------------------------------------------------------------
 
@@ -23,7 +23,9 @@ is
     v_count_ts       number      := 0;
     v_count_tstz     number      := 0;
     v_count_tsltz    number      := 0;
+
     ----------------------------------------
+
     procedure process_table_columns is
     begin
         for i in ( select column_name,
@@ -69,7 +71,9 @@ is
                 p_value => initcap(replace(i.column_name, '_', ' ')) );
         end loop;
     end process_table_columns;
+
     ----------------------------------------
+
     procedure fill_up_generic_columns (
         p_type in varchar2 )
     is
@@ -95,7 +99,9 @@ is
                 p_value => null );
         end loop;
     end fill_up_generic_columns;
+
     ----------------------------------------
+
 begin
     process_table_columns;
 
@@ -114,5 +120,5 @@ end get_table_query;
 
 --------------------------------------------------------------------------------
 
-end dito_apex;
+end model_joel;
 /

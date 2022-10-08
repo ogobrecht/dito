@@ -1,13 +1,13 @@
--- check for errors in package dito
+-- check for errors in package model_joel
 declare
   v_count pls_integer;
 begin
   select count(*)
     into v_count
     from user_errors
-   where name = 'DITO';
+   where name = 'MODEL_JOEL';
   if v_count > 0 then
-    dbms_output.put_line('- Package DITO has errors :-(');
+    dbms_output.put_line('- Package MODEL_JOEL has errors :-(');
   end if;
 end;
 /
@@ -22,5 +22,5 @@ select name || case when type like '%BODY' then ' body' end as "Name",
        attribute               as "Type",
        text                    as "Message"
   from user_errors
- where name = 'DITO'
+ where name = 'MODEL_JOEL'
  order by name, line, position;

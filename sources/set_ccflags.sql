@@ -1,4 +1,4 @@
--- select * from all_plsql_object_settings where name = 'DITO';
+-- select * from all_plsql_object_settings where name = 'MODEL';
 
 prompt - Set compiler flags
 declare
