@@ -7,24 +7,14 @@ c_license constant varchar2 ( 3 byte) := 'MIT';
 c_author  constant varchar2 (15 byte) := 'Ottmar Gobrecht';
 
 c_dict_tabs_list constant varchar2 (1000 byte) := '
-    user_tables         ,
-    user_tab_columns    ,
-    user_constraints    ,
-    user_cons_columns   ,
-    user_indexes        ,
-    user_ind_columns    ,
-    user_tab_comments   ,
-    user_mview_comments ,
-    user_col_comments   ,
-    all_tables          ,
-    all_tab_columns     ,
-    all_constraints     ,
-    all_cons_columns    ,
-    all_indexes         ,
-    all_ind_columns     ,
-    all_tab_comments    ,
-    all_mview_comments  ,
-    all_col_comments    ,
+    all_tables       ,
+    all_tab_columns  ,
+    all_constraints  ,
+    all_cons_columns ,
+    all_indexes      ,
+    all_ind_columns  ,
+    all_tab_comments ,
+    all_col_comments ,
 ';
 
 /**

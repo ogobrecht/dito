@@ -48,24 +48,14 @@ c_license constant varchar2 ( 3 byte) := 'MIT';
 c_author  constant varchar2 (15 byte) := 'Ottmar Gobrecht';
 
 c_dict_tabs_list constant varchar2 (1000 byte) := '
-    user_tables         ,
-    user_tab_columns    ,
-    user_constraints    ,
-    user_cons_columns   ,
-    user_indexes        ,
-    user_ind_columns    ,
-    user_tab_comments   ,
-    user_mview_comments ,
-    user_col_comments   ,
-    all_tables          ,
-    all_tab_columns     ,
-    all_constraints     ,
-    all_cons_columns    ,
-    all_indexes         ,
-    all_ind_columns     ,
-    all_tab_comments    ,
-    all_mview_comments  ,
-    all_col_comments    ,
+    all_tables       ,
+    all_tab_columns  ,
+    all_constraints  ,
+    all_cons_columns ,
+    all_indexes      ,
+    all_ind_columns  ,
+    all_tab_comments ,
+    all_col_comments ,
 ';
 
 /**
@@ -289,24 +279,6 @@ end utl_runtime_seconds;
 
 --------------------------------------------------------------------------------
 
-function utl_get_mview_comments (
-    p_mview_name in varchar2 )
-    return varchar2
-is
-    v_return varchar2(32767);
-begin
-    select comments
-      into v_return
-      from user_mview_comments
-     where mview_name = p_mview_name;
-    return v_return;
-exception
-    when no_data_found then
-        return null;
-end utl_get_mview_comments;
-
---------------------------------------------------------------------------------
-
 function utl_create_dict_mview (
     p_table_name in varchar2 )
     return integer
@@ -360,7 +332,6 @@ begin
 
     if v_code is not null then
         v_return := 1;
-
         v_code   := 'create materialized view ' || v_mview_name
                         || ' as '                     || c_lf
                         || 'select'                   || c_lf
@@ -369,11 +340,6 @@ begin
                         || '  ' || v_table_name;
         --dbms_output.put_line(v_code);
         dbms_output.put_line('- ' || v_mview_name);
-        execute immediate(v_code);
-
-        v_code := 'comment on materialized view ' || p_table_name || ' is '''
-                    || utl_get_mview_comments(p_table_name)
-                    || c_mview_comments_postfix || c_version;
         execute immediate(v_code);
     end if;
 

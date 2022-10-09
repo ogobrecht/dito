@@ -4,10 +4,14 @@
 Oracle Data Model Utilities - APEX Extension
 ============================================
 
+- [Package model_joel](#package-model_joel)
+- [Function get_table_query_apex](#function-get_table_query_apex)
+- [Procedure create_application_items](#procedure-create_application_items)
+
+
 ## Package model_joel
 
-Helpers to support a generic Interactive Report to show the data of all
-tables.
+Helpers to support a generic Interactive Report to show the data any table.
 
 SIGNATURE
 
@@ -16,7 +20,7 @@ package model_joel authid current_user is
 ```
 
 
-## Function get_table_query
+## Function get_table_query_apex
 
 Get the query for a given table.
 
@@ -33,16 +37,68 @@ select model_joel.get_table_query(p_table_name => 'CONSOLE_LOGS')
 SIGNATURE
 
 ```sql
-function get_table_query (
+function get_table_query_apex (
     p_table_name             in varchar2,
     p_schema_name            in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
-    p_max_cols_varchar       in integer default 20,
     p_max_cols_number        in integer default 20,
-    p_max_cols_date          in integer default 20,
-    p_max_cols_timestamp     in integer default 20,
-    p_max_cols_timestamp_tz  in integer default 20,
-    p_max_cols_timestamp_ltz in integer default 20 )
+    p_max_cols_varchar       in integer default 20,
+    p_max_cols_clob          in integer default  5,
+    p_max_cols_date          in integer default  5,
+    p_max_cols_timestamp     in integer default  5,
+    p_max_cols_timestamp_tz  in integer default  5,
+    p_max_cols_timestamp_ltz in integer default  5 )
     return varchar2;
+```
+
+
+## Procedure create_application_items
+
+Create application items for the generic report to control which columns to
+show and what the headers are.
+
+This procedure needs an APEX session to work and the application needs to be
+runtime modifiable. This cn be set under: Shared Components > Security
+Attributes > Runtime API Usage > Check "Modify This Application".
+
+EXAMPLE
+
+```sql
+-- in a script with defaults
+exec apex_session.create_session(100, 1, 'MY_USER');
+exec model_joel.create_application_items(100);
+
+-- with custom settings
+begin
+    apex_session.create_session (
+        p_app_id   => 100,
+        p_page_id  => 1,
+        p_username => 'MY_USER' );
+
+    model_joel.create_application_items (
+        p_app_id                 => 100,
+        p_max_cols_number        =>  40,
+        p_max_cols_varchar       =>  40,
+        p_max_cols_clob          =>  10,
+        p_max_cols_date          =>  10,
+        p_max_cols_timestamp     =>  10,
+        p_max_cols_timestamp_tz  =>  10,
+        p_max_cols_timestamp_ltz =>  10 );
+end;
+/
+```
+
+SIGNATURE
+
+```sql
+procedure create_application_items (
+    p_app_id                 in integer,
+    p_max_cols_number        in integer default 20,
+    p_max_cols_varchar       in integer default 20,
+    p_max_cols_clob          in integer default  5,
+    p_max_cols_date          in integer default  5,
+    p_max_cols_timestamp     in integer default  5,
+    p_max_cols_timestamp_tz  in integer default  5,
+    p_max_cols_timestamp_ltz in integer default  5 );
 ```
 
 
