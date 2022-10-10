@@ -6,12 +6,12 @@ function get_table_query_apex (
     p_table_name             in varchar2,
     p_schema_name            in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
     p_max_cols_number        in integer default 20,
-    p_max_cols_varchar       in integer default 20,
-    p_max_cols_clob          in integer default  5,
     p_max_cols_date          in integer default  5,
-    p_max_cols_timestamp     in integer default  5,
+    p_max_cols_timestamp_ltz in integer default  5,
     p_max_cols_timestamp_tz  in integer default  5,
-    p_max_cols_timestamp_ltz in integer default  5 )
+    p_max_cols_timestamp     in integer default  5,
+    p_max_cols_varchar       in integer default 20,
+    p_max_cols_clob          in integer default  5 )
     return varchar2
 is
     v_return            varchar2(32767);
@@ -54,16 +54,6 @@ is
                     v_column_expression := i.column_name;
                     v_generic_column    := 'N' || lpad(to_char(v_count_n), 3, '0');
 
-                when i.data_type in ('CHAR', 'VARCHAR2') and v_count_vc < p_max_cols_varchar then
-                    v_count_vc          := v_count_vc + 1;
-                    v_column_expression := i.column_name;
-                    v_generic_column    := 'VC' || lpad(to_char(v_count_vc), 3, '0');
-
-                when i.data_type = 'CLOB' and v_count_clob < p_max_cols_clob then
-                    v_count_clob        := v_count_clob + 1;
-                    v_column_expression := 'substr(' || i.column_name || ', 1, 4000)';
-                    v_generic_column    := 'CLOB' || lpad(to_char(v_count_clob), 3, '0');
-
                 when i.data_type = 'DATE' and v_count_d < p_max_cols_date then
                     v_count_d           := v_count_d + 1;
                     v_column_expression := i.column_name;
@@ -83,6 +73,16 @@ is
                     v_count_ts          := v_count_ts + 1;
                     v_column_expression := i.column_name;
                     v_generic_column    := 'TS' || lpad(to_char(v_count_ts), 3, '0');
+
+                when i.data_type in ('CHAR', 'VARCHAR2') and v_count_vc < p_max_cols_varchar then
+                    v_count_vc          := v_count_vc + 1;
+                    v_column_expression := i.column_name;
+                    v_generic_column    := 'VC' || lpad(to_char(v_count_vc), 3, '0');
+
+                when i.data_type = 'CLOB' and v_count_clob < p_max_cols_clob then
+                    v_count_clob        := v_count_clob + 1;
+                    v_column_expression := 'substr(' || i.column_name || ', 1, 4000)';
+                    v_generic_column    := 'CLOB' || lpad(to_char(v_count_clob), 3, '0');
 
                 else
                     v_column_included := false;
@@ -105,32 +105,32 @@ is
     procedure fill_up_generic_columns (
         p_type in varchar2 )
     is
-        v_count     pls_integer;
-        v_max_count pls_integer;
+        v_count    pls_integer;
+        v_max_cols pls_integer;
     begin
         v_count :=
             case p_type
                 when 'N'     then v_count_n
+                when 'D'     then v_count_d
+                when 'TSLTZ' then v_count_tsltz
+                when 'TSTZ'  then v_count_tstz
+                when 'TS'    then v_count_ts
                 when 'VC'    then v_count_vc
                 when 'CLOB'  then v_count_clob
-                when 'D'     then v_count_d
-                when 'TS'    then v_count_ts
-                when 'TSTZ'  then v_count_tstz
-                when 'TSLTZ' then v_count_tsltz
             end + 1;
 
-        v_max_count :=
+        v_max_cols :=
             case p_type
                 when 'N'     then p_max_cols_number
+                when 'D'     then p_max_cols_date
+                when 'TSLTZ' then p_max_cols_timestamp_ltz
+                when 'TSTZ'  then p_max_cols_timestamp_tz
+                when 'TS'    then p_max_cols_timestamp
                 when 'VC'    then p_max_cols_varchar
                 when 'CLOB'  then p_max_cols_clob
-                when 'D'     then p_max_cols_date
-                when 'TS'    then p_max_cols_timestamp
-                when 'TSTZ'  then p_max_cols_timestamp_tz
-                when 'TSLTZ' then p_max_cols_timestamp_ltz
             end;
 
-        for i in v_count .. v_max_count loop
+        for i in v_count .. v_max_cols loop
             v_generic_column := p_type || lpad(to_char(i), 3, '0');
 
             v_return         := v_return || v_column_indent ||
@@ -149,9 +149,9 @@ begin
 
     fill_up_generic_columns(p_type => 'N'    );
     fill_up_generic_columns(p_type => 'D'    );
-    fill_up_generic_columns(p_type => 'TS'   );
-    fill_up_generic_columns(p_type => 'TSTZ' );
     fill_up_generic_columns(p_type => 'TSLTZ');
+    fill_up_generic_columns(p_type => 'TSTZ' );
+    fill_up_generic_columns(p_type => 'TS'   );
     fill_up_generic_columns(p_type => 'VC'   );
     fill_up_generic_columns(p_type => 'CLOB' );
 
@@ -184,8 +184,7 @@ is
         p_type in varchar2 )
     is
         v_generic_column varchar2(30);
-        v_count          pls_integer;
-        v_max_count      pls_integer;
+        v_max_cols       pls_integer;
         v_count_n        pls_integer := 0;
         v_count_vc       pls_integer := 0;
         v_count_clob     pls_integer := 0;
@@ -194,32 +193,27 @@ is
         v_count_tstz     pls_integer := 0;
         v_count_tsltz    pls_integer := 0;
     begin
-        v_count :=
-            case p_type
-                when 'N'     then v_count_n
-                when 'VC'    then v_count_vc
-                when 'CLOB'  then v_count_clob
-                when 'D'     then v_count_d
-                when 'TS'    then v_count_ts
-                when 'TSTZ'  then v_count_tstz
-                when 'TSLTZ' then v_count_tsltz
-            end + 1;
-
-        v_max_count :=
+        v_max_cols :=
             case p_type
                 when 'N'     then p_max_cols_number
+                when 'D'     then p_max_cols_date
+                when 'TSLTZ' then p_max_cols_timestamp_ltz
+                when 'TSTZ'  then p_max_cols_timestamp_tz
+                when 'TS'    then p_max_cols_timestamp
                 when 'VC'    then p_max_cols_varchar
                 when 'CLOB'  then p_max_cols_clob
-                when 'D'     then p_max_cols_date
-                when 'TS'    then p_max_cols_timestamp
-                when 'TSTZ'  then p_max_cols_timestamp_tz
-                when 'TSLTZ' then p_max_cols_timestamp_ltz
             end;
 
-        for i in v_count .. v_max_count loop
+        for i in 1 .. v_max_cols loop
             v_generic_column := p_type || lpad(to_char(i), 3, '0');
 
-            --FIXME: create page item
+            if not v_app_items.exists(v_generic_column) then
+                wwv_flow_imp_shared.create_flow_item (
+                    p_flow_id          => p_app_id,
+                    p_id               => wwv_flow_id.next_val,
+                    p_name             => v_generic_column,
+                    p_protection_level => 'I' );
+            end if;
 
         end loop;
     end create_items;
@@ -240,8 +234,13 @@ begin
     end loop;
 
     -- create app items as needed
-
-    --FIXME: call subprocedure
+    create_items(p_type => 'N'    );
+    create_items(p_type => 'D'    );
+    create_items(p_type => 'TSLTZ');
+    create_items(p_type => 'TSTZ' );
+    create_items(p_type => 'TS'   );
+    create_items(p_type => 'VC'   );
+    create_items(p_type => 'CLOB' );
 
 end create_application_items;
 

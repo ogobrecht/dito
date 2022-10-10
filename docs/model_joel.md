@@ -41,12 +41,12 @@ function get_table_query_apex (
     p_table_name             in varchar2,
     p_schema_name            in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
     p_max_cols_number        in integer default 20,
-    p_max_cols_varchar       in integer default 20,
-    p_max_cols_clob          in integer default  5,
     p_max_cols_date          in integer default  5,
-    p_max_cols_timestamp     in integer default  5,
+    p_max_cols_timestamp_ltz in integer default  5,
     p_max_cols_timestamp_tz  in integer default  5,
-    p_max_cols_timestamp_ltz in integer default  5 )
+    p_max_cols_timestamp     in integer default  5,
+    p_max_cols_varchar       in integer default 20,
+    p_max_cols_clob          in integer default  5 )
     return varchar2;
 ```
 
@@ -77,12 +77,12 @@ begin
     model_joel.create_application_items (
         p_app_id                 => 100,
         p_max_cols_number        =>  40,
-        p_max_cols_varchar       =>  40,
-        p_max_cols_clob          =>  10,
         p_max_cols_date          =>  10,
-        p_max_cols_timestamp     =>  10,
+        p_max_cols_timestamp_ltz =>  10,
         p_max_cols_timestamp_tz  =>  10,
-        p_max_cols_timestamp_ltz =>  10 );
+        p_max_cols_timestamp     =>  10,
+        p_max_cols_varchar       =>  40,
+        p_max_cols_clob          =>  10 );
 end;
 /
 ```
