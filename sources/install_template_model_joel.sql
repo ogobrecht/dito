@@ -19,6 +19,7 @@ prompt - Package model_joel (body)
 @show_errors_model_joel.sql
 prompt - FINISHED
 
-exec apex_session.create_session(103, 1, 'OGOBRECH');
-exec model_joel.create_application_items(103);
+--exec apex_session.create_session(103, 1, 'OGOBRECH');
+--exec model_joel.create_application_items(103);
+--exec model_joel.create_interactive_report(103,1);
 

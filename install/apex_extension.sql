@@ -48,19 +48,20 @@ create or replace package model_joel authid current_user is
 Oracle Data Model Utilities - APEX Extension
 ============================================
 
-Helpers to support a generic Interactive Report to show the data any table.
+Helpers to support a generic Interactive Report to show the data of any
+table.
 
 **/
 
 function get_table_query_apex (
-    p_table_name             in varchar2,
+    p_table_name             in varchar2           ,
     p_schema_name            in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
-    p_max_cols_number        in integer default 20,
-    p_max_cols_date          in integer default  5,
-    p_max_cols_timestamp_ltz in integer default  5,
-    p_max_cols_timestamp_tz  in integer default  5,
-    p_max_cols_timestamp     in integer default  5,
-    p_max_cols_varchar       in integer default 20,
+    p_max_cols_number        in integer default 20 ,
+    p_max_cols_date          in integer default  5 ,
+    p_max_cols_timestamp_ltz in integer default  5 ,
+    p_max_cols_timestamp_tz  in integer default  5 ,
+    p_max_cols_timestamp     in integer default  5 ,
+    p_max_cols_varchar       in integer default 20 ,
     p_max_cols_clob          in integer default  5 )
     return varchar2;
 /**
@@ -80,14 +81,14 @@ select model_joel.get_table_query(p_table_name => 'CONSOLE_LOGS')
 **/
 
 procedure create_application_items (
-    p_app_id                 in integer,
-    p_max_cols_number        in integer default 20,
-    p_max_cols_varchar       in integer default 20,
-    p_max_cols_clob          in integer default  5,
-    p_max_cols_date          in integer default  5,
-    p_max_cols_timestamp     in integer default  5,
-    p_max_cols_timestamp_tz  in integer default  5,
-    p_max_cols_timestamp_ltz in integer default  5 );
+    p_app_id                 in integer            ,
+    p_max_cols_number        in integer default 20 ,
+    p_max_cols_date          in integer default  5 ,
+    p_max_cols_timestamp_ltz in integer default  5 ,
+    p_max_cols_timestamp_tz  in integer default  5 ,
+    p_max_cols_timestamp     in integer default  5 ,
+    p_max_cols_varchar       in integer default 20 ,
+    p_max_cols_clob          in integer default  5 );
 /**
 
 Create application items for the generic report to control which columns to
@@ -112,13 +113,13 @@ begin
         p_username => 'MY_USER' );
 
     model_joel.create_application_items (
-        p_app_id                 => 100,
-        p_max_cols_number        =>  40,
-        p_max_cols_date          =>  10,
-        p_max_cols_timestamp_ltz =>  10,
-        p_max_cols_timestamp_tz  =>  10,
-        p_max_cols_timestamp     =>  10,
-        p_max_cols_varchar       =>  40,
+        p_app_id                 => 100 ,
+        p_max_cols_number        =>  40 ,
+        p_max_cols_date          =>  10 ,
+        p_max_cols_timestamp_ltz =>  10 ,
+        p_max_cols_timestamp_tz  =>  10 ,
+        p_max_cols_timestamp     =>  10 ,
+        p_max_cols_varchar       =>  40 ,
         p_max_cols_clob          =>  10 );
 end;
 {{/}}
@@ -126,6 +127,56 @@ end;
 
 **/
 
+--------------------------------------------------------------------------------
+
+procedure create_interactive_report (
+    p_app_id                 in integer            ,
+    p_page_id                in integer            ,
+    p_max_cols_number        in integer default 20 ,
+    p_max_cols_date          in integer default  5 ,
+    p_max_cols_timestamp_ltz in integer default  5 ,
+    p_max_cols_timestamp_tz  in integer default  5 ,
+    p_max_cols_timestamp     in integer default  5 ,
+    p_max_cols_varchar       in integer default 20 ,
+    p_max_cols_clob          in integer default  5 );
+/**
+
+Create an interactive report with generic columns to show the data of any
+table.
+
+This procedure needs an APEX session to work and the application needs to be
+runtime modifiable. This cn be set under: Shared Components > Security
+Attributes > Runtime API Usage > Check "Modify This Application".
+
+EXAMPLE
+
+```sql
+-- in a script with defaults
+exec apex_session.create_session(100, 1, 'MY_USER');
+exec model_joel.create_interactive_report(100, 1);
+
+-- with custom settings
+begin
+    apex_session.create_session (
+        p_app_id   => 100,
+        p_page_id  => 1,
+        p_username => 'MY_USER' );
+
+    model_joel.create_interactive_report (
+        p_app_id                 => 100 ,
+        p_page_id                =>   1 ,
+        p_max_cols_number        =>  40 ,
+        p_max_cols_date          =>  10 ,
+        p_max_cols_timestamp_ltz =>  10 ,
+        p_max_cols_timestamp_tz  =>  10 ,
+        p_max_cols_timestamp     =>  10 ,
+        p_max_cols_varchar       =>  40 ,
+        p_max_cols_clob          =>  10 );
+end;
+{{/}}
+```
+
+**/
 --------------------------------------------------------------------------------
 
 end model_joel;
@@ -137,14 +188,14 @@ create or replace package body model_joel is
 --------------------------------------------------------------------------------
 
 function get_table_query_apex (
-    p_table_name             in varchar2,
+    p_table_name             in varchar2           ,
     p_schema_name            in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
-    p_max_cols_number        in integer default 20,
-    p_max_cols_date          in integer default  5,
-    p_max_cols_timestamp_ltz in integer default  5,
-    p_max_cols_timestamp_tz  in integer default  5,
-    p_max_cols_timestamp     in integer default  5,
-    p_max_cols_varchar       in integer default 20,
+    p_max_cols_number        in integer default 20 ,
+    p_max_cols_date          in integer default  5 ,
+    p_max_cols_timestamp_ltz in integer default  5 ,
+    p_max_cols_timestamp_tz  in integer default  5 ,
+    p_max_cols_timestamp     in integer default  5 ,
+    p_max_cols_varchar       in integer default 20 ,
     p_max_cols_clob          in integer default  5 )
     return varchar2
 is
@@ -264,7 +315,8 @@ is
                 when 'CLOB'  then p_max_cols_clob
             end;
 
-        for i in v_count .. v_max_cols loop
+        for i in v_count .. v_max_cols
+        loop
             v_generic_column := p_type || lpad(to_char(i), 3, '0');
 
             v_return         := v_return || v_column_indent ||
@@ -281,13 +333,13 @@ is
 begin
     process_table_columns;
 
-    fill_up_generic_columns(p_type => 'N'    );
-    fill_up_generic_columns(p_type => 'D'    );
-    fill_up_generic_columns(p_type => 'TSLTZ');
-    fill_up_generic_columns(p_type => 'TSTZ' );
-    fill_up_generic_columns(p_type => 'TS'   );
-    fill_up_generic_columns(p_type => 'VC'   );
-    fill_up_generic_columns(p_type => 'CLOB' );
+    fill_up_generic_columns ( p_type => 'N'     );
+    fill_up_generic_columns ( p_type => 'D'     );
+    fill_up_generic_columns ( p_type => 'TSLTZ' );
+    fill_up_generic_columns ( p_type => 'TSTZ'  );
+    fill_up_generic_columns ( p_type => 'TS'    );
+    fill_up_generic_columns ( p_type => 'VC'    );
+    fill_up_generic_columns ( p_type => 'CLOB'  );
 
     v_return :=    'select ' || rtrim( ltrim(v_return), v_sep ) || chr(10)
                 || '  from ' || case when v_table_exists
@@ -301,14 +353,14 @@ end get_table_query_apex;
 --------------------------------------------------------------------------------
 
 procedure create_application_items (
-    p_app_id                 in integer,
-    p_max_cols_number        in integer default 20,
-    p_max_cols_varchar       in integer default 20,
-    p_max_cols_clob          in integer default  5,
-    p_max_cols_date          in integer default  5,
-    p_max_cols_timestamp     in integer default  5,
-    p_max_cols_timestamp_tz  in integer default  5,
-    p_max_cols_timestamp_ltz in integer default  5 )
+    p_app_id                 in integer            ,
+    p_max_cols_number        in integer default 20 ,
+    p_max_cols_date          in integer default  5 ,
+    p_max_cols_timestamp_ltz in integer default  5 ,
+    p_max_cols_timestamp_tz  in integer default  5 ,
+    p_max_cols_timestamp     in integer default  5 ,
+    p_max_cols_varchar       in integer default 20 ,
+    p_max_cols_clob          in integer default  5 )
 is
     v_app_items wwv_flow_global.vc_map;
 
@@ -338,7 +390,8 @@ is
                 when 'CLOB'  then p_max_cols_clob
             end;
 
-        for i in 1 .. v_max_cols loop
+        for i in 1 .. v_max_cols
+        loop
             v_generic_column := p_type || lpad(to_char(i), 3, '0');
 
             if not v_app_items.exists(v_generic_column) then
@@ -348,7 +401,6 @@ is
                     p_name             => v_generic_column,
                     p_protection_level => 'I' );
             end if;
-
         end loop;
     end create_items;
 
@@ -368,15 +420,186 @@ begin
     end loop;
 
     -- create app items as needed
-    create_items(p_type => 'N'    );
-    create_items(p_type => 'D'    );
-    create_items(p_type => 'TSLTZ');
-    create_items(p_type => 'TSTZ' );
-    create_items(p_type => 'TS'   );
-    create_items(p_type => 'VC'   );
-    create_items(p_type => 'CLOB' );
+    create_items( p_type => 'N'     );
+    create_items( p_type => 'D'     );
+    create_items( p_type => 'TSLTZ' );
+    create_items( p_type => 'TSTZ'  );
+    create_items( p_type => 'TS'    );
+    create_items( p_type => 'VC'    );
+    create_items( p_type => 'CLOB'  );
 
 end create_application_items;
+
+--------------------------------------------------------------------------------
+
+procedure create_interactive_report (
+    p_app_id                 in integer            ,
+    p_page_id                in integer            ,
+    p_max_cols_number        in integer default 20 ,
+    p_max_cols_date          in integer default  5 ,
+    p_max_cols_timestamp_ltz in integer default  5 ,
+    p_max_cols_timestamp_tz  in integer default  5 ,
+    p_max_cols_timestamp     in integer default  5 ,
+    p_max_cols_varchar       in integer default 20 ,
+    p_max_cols_clob          in integer default  5 )
+is
+    v_display_order number := 10;
+
+    ----------------------------------------
+
+    function get_template_id (
+        p_type  in varchar2,
+        p_name  in varchar2,
+        p_theme in number default 42)
+        return number
+    is
+        v_return number;
+    begin
+        select
+            template_id
+        into
+            v_return
+        from
+            apex_application_templates
+        where
+            application_id = p_app_id
+            and theme_number = 42
+            and template_type = p_type
+            and template_name = p_name;
+    return v_return;
+    exception
+        when no_data_found then
+            return null;
+    end get_template_id;
+
+    ----------------------------------------
+
+    procedure create_report
+    is
+        v_temp_id number;
+    begin
+        wwv_flow_imp_page.create_page_plug (
+            p_flow_id                     => p_app_id,
+            p_page_id                     => p_page_id,
+            p_id                          => wwv_flow_id.next_val,
+            p_plug_name                   => 'Generic Table Data Report',
+            p_region_template_options     => '#DEFAULT#',
+            p_component_template_options  => '#DEFAULT#',
+            p_plug_template               => get_template_id('Region', 'Interactive Report'),
+            p_plug_display_sequence       => 10,
+            p_include_in_reg_disp_sel_yn  => 'Y',
+            p_query_type                  => 'FUNC_BODY_RETURNING_SQL',
+            p_function_body_language      => 'PLSQL',
+            p_plug_source                 => 'return model_joel.get_table_query_apex(:your_table_item_here)',
+            p_plug_source_type            => 'NATIVE_IR',
+            p_plug_query_options          => 'DERIVED_REPORT_COLUMNS',
+            p_prn_content_disposition     => 'ATTACHMENT',
+            p_prn_units                   => 'INCHES',
+            p_prn_paper_size              => 'LETTER',
+            p_prn_width                   => 11,
+            p_prn_height                  => 8.5,
+            p_prn_orientation             => 'HORIZONTAL',
+            p_prn_page_header             => 'Generic Table Data Report',
+            p_prn_page_header_font_color  => '#000000',
+            p_prn_page_header_font_family => 'Helvetica',
+            p_prn_page_header_font_weight => 'normal',
+            p_prn_page_header_font_size   => '12',
+            p_prn_page_footer_font_color  => '#000000',
+            p_prn_page_footer_font_family => 'Helvetica',
+            p_prn_page_footer_font_weight => 'normal',
+            p_prn_page_footer_font_size   => '12',
+            p_prn_header_bg_color         => '#EEEEEE',
+            p_prn_header_font_color       => '#000000',
+            p_prn_header_font_family      => 'Helvetica',
+            p_prn_header_font_weight      => 'bold',
+            p_prn_header_font_size        => '10',
+            p_prn_body_bg_color           => '#FFFFFF',
+            p_prn_body_font_color         => '#000000',
+            p_prn_body_font_family        => 'Helvetica',
+            p_prn_body_font_weight        => 'normal',
+            p_prn_body_font_size          => '10',
+            p_prn_border_width            => .5,
+            p_prn_page_header_alignment   => 'CENTER',
+            p_prn_page_footer_alignment   => 'CENTER',
+            p_prn_border_color            => '#666666' );
+
+        v_temp_id := wwv_flow_id.next_val;
+
+        wwv_flow_imp_page.create_worksheet (
+            p_flow_id                => p_app_id,
+            p_page_id                => p_page_id,
+            p_id                     => v_temp_id,
+            p_max_row_count          => '1000000',
+            p_pagination_type        => 'ROWS_X_TO_Y',
+            p_pagination_display_pos => 'BOTTOM_RIGHT',
+            p_show_display_row_count => 'Y',
+            p_report_list_mode       => 'TABS',
+            p_lazy_loading           => false,
+            p_show_detail_link       => 'N',
+            p_show_notify            => 'Y',
+            p_download_formats       => 'CSV:HTML:XLSX:PDF',
+            p_enable_mail_download   => 'Y',
+            p_owner                  => apex_application.g_user,
+            p_internal_uid           => v_temp_id );
+    end create_report;
+
+    ----------------------------------------
+
+    procedure create_report_columns (
+        p_type in varchar2 )
+    is
+        v_generic_column varchar2(30);
+        v_max_cols       pls_integer;
+        v_count_n        pls_integer := 0;
+        v_count_vc       pls_integer := 0;
+        v_count_clob     pls_integer := 0;
+        v_count_d        pls_integer := 0;
+        v_count_ts       pls_integer := 0;
+        v_count_tstz     pls_integer := 0;
+        v_count_tsltz    pls_integer := 0;
+    begin
+        v_max_cols :=
+            case p_type
+                when 'N'     then p_max_cols_number
+                when 'D'     then p_max_cols_date
+                when 'TSLTZ' then p_max_cols_timestamp_ltz
+                when 'TSTZ'  then p_max_cols_timestamp_tz
+                when 'TS'    then p_max_cols_timestamp
+                when 'VC'    then p_max_cols_varchar
+                when 'CLOB'  then p_max_cols_clob
+            end;
+
+        for i in 1 .. v_max_cols
+        loop
+            v_generic_column := p_type || lpad(to_char(i), 3, '0');
+
+            wwv_flow_imp_page.create_worksheet_column (
+                p_id                => wwv_flow_id.next_val,
+                p_db_column_name    => v_generic_column,
+                p_display_order     => v_display_order,
+                p_column_identifier => v_generic_column,
+                p_column_label      => '&'||v_generic_column||'.',
+                p_column_type       => 'STRING',
+                p_use_as_row_header => 'N' );
+
+            v_display_order := v_display_order + 10;
+        end loop;
+    end create_report_columns;
+
+    ----------------------------------------
+
+begin
+
+    create_report;
+    create_report_columns ( p_type => 'N'     );
+    create_report_columns ( p_type => 'D'     );
+    create_report_columns ( p_type => 'TSLTZ' );
+    create_report_columns ( p_type => 'TSTZ'  );
+    create_report_columns ( p_type => 'TS'    );
+    create_report_columns ( p_type => 'VC'    );
+    create_report_columns ( p_type => 'CLOB'  );
+
+end create_interactive_report;
 
 --------------------------------------------------------------------------------
 
@@ -411,6 +634,7 @@ select name || case when type like '%BODY' then ' body' end as "Name",
 
 prompt - FINISHED
 
-exec apex_session.create_session(103, 1, 'OGOBRECH');
-exec model_joel.create_application_items(103);
+--exec apex_session.create_session(103, 1, 'OGOBRECH');
+--exec model_joel.create_application_items(103);
+--exec model_joel.create_interactive_report(103,1);
 
