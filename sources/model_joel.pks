@@ -10,9 +10,10 @@ table.
 
 **/
 
-function get_table_query_apex (
+--------------------------------------------------------------------------------
+
+function get_table_query (
     p_table_name             in varchar2           ,
-    p_schema_name            in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
     p_max_cols_number        in integer default 20 ,
     p_max_cols_date          in integer default  5 ,
     p_max_cols_timestamp_ltz in integer default  5 ,
@@ -37,6 +38,32 @@ select model_joel.get_table_query(p_table_name => 'CONSOLE_LOGS')
 
 **/
 
+--------------------------------------------------------------------------------
+
+procedure set_session_state (
+    p_table_name             in varchar2           , -- you can prepend the schema: my_schema.my_table (default is sys_context('USERENV', 'CURRENT_USER'))
+    p_max_cols_number        in integer default 20 ,
+    p_max_cols_date          in integer default  5 ,
+    p_max_cols_timestamp_ltz in integer default  5 ,
+    p_max_cols_timestamp_tz  in integer default  5 ,
+    p_max_cols_timestamp     in integer default  5 ,
+    p_max_cols_varchar       in integer default 20 ,
+    p_max_cols_clob          in integer default  5 );
+/**
+
+set the session state of application items for a given table. The state is then
+used for conditional display of report columns as well for the report headers.
+
+EXAMPLE
+
+```sql
+model_joel.set_session_state(p_table_name => 'CONSOLE_LOGS');
+```
+
+**/
+
+--------------------------------------------------------------------------------
+
 procedure create_application_items (
     p_app_id                 in integer            ,
     p_max_cols_number        in integer default 20 ,
@@ -48,11 +75,11 @@ procedure create_application_items (
     p_max_cols_clob          in integer default  5 );
 /**
 
-Create application items for the generic report to control which columns to
+Create application items for a generic report to control which columns to
 show and what the headers are.
 
 This procedure needs an APEX session to work and the application needs to be
-runtime modifiable. This cn be set under: Shared Components > Security
+runtime modifiable. This can be set under: Shared Components > Security
 Attributes > Runtime API Usage > Check "Modify This Application".
 
 EXAMPLE

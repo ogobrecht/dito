@@ -53,9 +53,10 @@ table.
 
 **/
 
-function get_table_query_apex (
+--------------------------------------------------------------------------------
+
+function get_table_query (
     p_table_name             in varchar2           ,
-    p_schema_name            in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
     p_max_cols_number        in integer default 20 ,
     p_max_cols_date          in integer default  5 ,
     p_max_cols_timestamp_ltz in integer default  5 ,
@@ -80,6 +81,32 @@ select model_joel.get_table_query(p_table_name => 'CONSOLE_LOGS')
 
 **/
 
+--------------------------------------------------------------------------------
+
+procedure set_session_state (
+    p_table_name             in varchar2           , -- you can prepend the schema: my_schema.my_table (default is sys_context('USERENV', 'CURRENT_USER'))
+    p_max_cols_number        in integer default 20 ,
+    p_max_cols_date          in integer default  5 ,
+    p_max_cols_timestamp_ltz in integer default  5 ,
+    p_max_cols_timestamp_tz  in integer default  5 ,
+    p_max_cols_timestamp     in integer default  5 ,
+    p_max_cols_varchar       in integer default 20 ,
+    p_max_cols_clob          in integer default  5 );
+/**
+
+set the session state of application items for a given table. The state is then
+used for conditional display of report columns as well for the report headers.
+
+EXAMPLE
+
+```sql
+model_joel.set_session_state(p_table_name => 'CONSOLE_LOGS');
+```
+
+**/
+
+--------------------------------------------------------------------------------
+
 procedure create_application_items (
     p_app_id                 in integer            ,
     p_max_cols_number        in integer default 20 ,
@@ -91,11 +118,11 @@ procedure create_application_items (
     p_max_cols_clob          in integer default  5 );
 /**
 
-Create application items for the generic report to control which columns to
+Create application items for a generic report to control which columns to
 show and what the headers are.
 
 This procedure needs an APEX session to work and the application needs to be
-runtime modifiable. This cn be set under: Shared Components > Security
+runtime modifiable. This can be set under: Shared Components > Security
 Attributes > Runtime API Usage > Check "Modify This Application".
 
 EXAMPLE
@@ -185,11 +212,19 @@ end model_joel;
 prompt - Package model_joel (body)
 create or replace package body model_joel is
 
+type columns_row is record (
+    column_expression varchar2(200) ,
+    column_alias      varchar2( 30) ,
+    column_header     varchar2(128) );
+
+type columns_tab is table of columns_row index by pls_integer;
+
+g_table_exists boolean;
+
 --------------------------------------------------------------------------------
 
-function get_table_query_apex (
+function get_columns (
     p_table_name             in varchar2           ,
-    p_schema_name            in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
     p_max_cols_number        in integer default 20 ,
     p_max_cols_date          in integer default  5 ,
     p_max_cols_timestamp_ltz in integer default  5 ,
@@ -197,14 +232,14 @@ function get_table_query_apex (
     p_max_cols_timestamp     in integer default  5 ,
     p_max_cols_varchar       in integer default 20 ,
     p_max_cols_clob          in integer default  5 )
-    return varchar2
+    return columns_tab
 is
-    v_return            varchar2(32767);
+    v_column_included   boolean;
+    v_schema_name       varchar2(30);--FIXME set schema name -  default sys_context('USERENV', 'CURRENT_USER'),
+    v_columns           columns_tab;
+    v_index             pls_integer;
     v_column_expression varchar2(200);
-    v_generic_column    varchar2(30);
-    v_sep               varchar2(2) := ',' || chr(10);
-    v_column_indent     varchar2(7) := '       ';
-    v_table_exists      boolean     := false;
+    v_column_alias      varchar2(30);
     v_count_n           pls_integer := 0;
     v_count_vc          pls_integer := 0;
     v_count_clob        pls_integer := 0;
@@ -217,7 +252,6 @@ is
 
     procedure process_table_columns
     is
-        v_column_included boolean;
     begin
         for i in (
             select
@@ -226,68 +260,66 @@ is
             from
                 all_tab_columns_mv
             where
-                owner = p_schema_name
+                owner = v_schema_name
                 and table_name = p_table_name
             order by
                 column_id )
         loop
-            v_table_exists    := true;
+            g_table_exists    := true;
             v_column_included := true;
             case
                 when i.data_type in ('NUMBER', 'FLOAT') and v_count_n < p_max_cols_number then
                     v_count_n           := v_count_n + 1;
                     v_column_expression := i.column_name;
-                    v_generic_column    := 'N' || lpad(to_char(v_count_n), 3, '0');
+                    v_column_alias      := 'N' || lpad(to_char(v_count_n), 3, '0');
 
                 when i.data_type = 'DATE' and v_count_d < p_max_cols_date then
                     v_count_d           := v_count_d + 1;
                     v_column_expression := i.column_name;
-                    v_generic_column    := 'D' || lpad(to_char(v_count_d), 3, '0');
+                    v_column_alias      := 'D' || lpad(to_char(v_count_d), 3, '0');
 
                 when i.data_type like 'TIMESTAMP% WITH LOCAL TIME ZONE' and v_count_tsltz < p_max_cols_timestamp_ltz then
                     v_count_tsltz       := v_count_tsltz + 1;
                     v_column_expression := i.column_name;
-                    v_generic_column    := 'TSLTZ' || lpad(to_char(v_count_tsltz), 3, '0');
+                    v_column_alias      := 'TSLTZ' || lpad(to_char(v_count_tsltz), 3, '0');
 
                 when i.data_type like 'TIMESTAMP% WITH TIME ZONE' and v_count_tstz < p_max_cols_timestamp_tz then
                     v_count_tstz        := v_count_tstz + 1;
                     v_column_expression := i.column_name;
-                    v_generic_column    := 'TSTZ' || lpad(to_char(v_count_tstz), 3, '0');
+                    v_column_alias      := 'TSTZ' || lpad(to_char(v_count_tstz), 3, '0');
 
                 when i.data_type like 'TIMESTAMP%' and v_count_ts < p_max_cols_timestamp then
                     v_count_ts          := v_count_ts + 1;
                     v_column_expression := i.column_name;
-                    v_generic_column    := 'TS' || lpad(to_char(v_count_ts), 3, '0');
+                    v_column_alias      := 'TS' || lpad(to_char(v_count_ts), 3, '0');
 
                 when i.data_type in ('CHAR', 'VARCHAR2') and v_count_vc < p_max_cols_varchar then
                     v_count_vc          := v_count_vc + 1;
                     v_column_expression := i.column_name;
-                    v_generic_column    := 'VC' || lpad(to_char(v_count_vc), 3, '0');
+                    v_column_alias      := 'VC' || lpad(to_char(v_count_vc), 3, '0');
 
                 when i.data_type = 'CLOB' and v_count_clob < p_max_cols_clob then
                     v_count_clob        := v_count_clob + 1;
                     v_column_expression := 'substr(' || i.column_name || ', 1, 4000)';
-                    v_generic_column    := 'CLOB' || lpad(to_char(v_count_clob), 3, '0');
+                    v_column_alias      := 'CLOB' || lpad(to_char(v_count_clob), 3, '0');
 
                 else
                     v_column_included := false;
             end case;
 
             if v_column_included then
-                v_return := v_return
-                    || v_column_indent || v_column_expression
-                    || ' as ' || v_generic_column || v_sep;
+                v_index := v_columns.count + 1;
+                v_columns(v_index).column_expression := v_column_expression;
+                v_columns(v_index).column_alias      := v_column_alias;
+                v_columns(v_index).column_header     := initcap(replace(i.column_name, '_', ' '));
             end if;
 
-            apex_util.set_session_state (
-                p_name  => v_generic_column,
-                p_value => initcap(replace(i.column_name, '_', ' ')) );
         end loop;
     end process_table_columns;
 
     ----------------------------------------
 
-    procedure fill_up_generic_columns (
+    procedure fill_gaps (
         p_type in varchar2 )
     is
         v_count    pls_integer;
@@ -317,38 +349,110 @@ is
 
         for i in v_count .. v_max_cols
         loop
-            v_generic_column := p_type || lpad(to_char(i), 3, '0');
-
-            v_return         := v_return || v_column_indent ||
-                                'null as ' || v_generic_column || v_sep;
-
-            apex_util.set_session_state (
-                p_name  => v_generic_column,
-                p_value => null );
+            v_index := v_columns.count + 1;
+            v_columns(v_index).column_expression := 'null';
+            v_columns(v_index).column_alias      := p_type || lpad(to_char(i), 3, '0');
         end loop;
-    end fill_up_generic_columns;
+    end fill_gaps;
 
     ----------------------------------------
 
 begin
+    g_table_exists := false;
+
     process_table_columns;
 
-    fill_up_generic_columns ( p_type => 'N'     );
-    fill_up_generic_columns ( p_type => 'D'     );
-    fill_up_generic_columns ( p_type => 'TSLTZ' );
-    fill_up_generic_columns ( p_type => 'TSTZ'  );
-    fill_up_generic_columns ( p_type => 'TS'    );
-    fill_up_generic_columns ( p_type => 'VC'    );
-    fill_up_generic_columns ( p_type => 'CLOB'  );
+    fill_gaps ( p_type => 'N'     );
+    fill_gaps ( p_type => 'D'     );
+    fill_gaps ( p_type => 'TSLTZ' );
+    fill_gaps ( p_type => 'TSTZ'  );
+    fill_gaps ( p_type => 'TS'    );
+    fill_gaps ( p_type => 'VC'    );
+    fill_gaps ( p_type => 'CLOB'  );
+
+    return v_columns;
+
+end get_columns;
+
+--------------------------------------------------------------------------------
+
+function get_table_query (
+    p_table_name             in varchar2           ,
+    p_max_cols_number        in integer default 20 ,
+    p_max_cols_date          in integer default  5 ,
+    p_max_cols_timestamp_ltz in integer default  5 ,
+    p_max_cols_timestamp_tz  in integer default  5 ,
+    p_max_cols_timestamp     in integer default  5 ,
+    p_max_cols_varchar       in integer default 20 ,
+    p_max_cols_clob          in integer default  5 )
+    return varchar2
+is
+    v_return        varchar2(32767);
+    v_columns       columns_tab;
+    v_sep           varchar2(2) := ',' || chr(10);
+    v_column_indent varchar2(7) := '       ';
+begin
+    v_columns := get_columns (
+        p_table_name             => p_table_name             ,
+        p_max_cols_number        => p_max_cols_number        ,
+        p_max_cols_date          => p_max_cols_date          ,
+        p_max_cols_timestamp_ltz => p_max_cols_timestamp_ltz ,
+        p_max_cols_timestamp_tz  => p_max_cols_timestamp_tz  ,
+        p_max_cols_timestamp     => p_max_cols_timestamp     ,
+        p_max_cols_varchar       => p_max_cols_varchar       ,
+        p_max_cols_clob          => p_max_cols_clob          );
+
+    for i in 1 .. v_columns.count loop
+        apex_util.set_session_state (
+            p_name  => v_columns(i).column_alias,
+            p_value => v_columns(i).column_header);
+        v_return := v_return
+            || v_column_indent
+            || v_columns(i).column_expression
+            || ' as '
+            || v_columns(i).column_alias
+            || v_sep;
+    end loop;
 
     v_return :=    'select ' || rtrim( ltrim(v_return), v_sep ) || chr(10)
-                || '  from ' || case when v_table_exists
-                                    then p_schema_name || '.' || p_table_name
+                || '  from ' || case when g_table_exists
+                                    then p_table_name
                                     else 'dual'
                                 end;
 
     return v_return;
-end get_table_query_apex;
+end get_table_query;
+
+--------------------------------------------------------------------------------
+
+procedure set_session_state (
+    p_table_name             in varchar2           ,
+    p_max_cols_number        in integer default 20 ,
+    p_max_cols_date          in integer default  5 ,
+    p_max_cols_timestamp_ltz in integer default  5 ,
+    p_max_cols_timestamp_tz  in integer default  5 ,
+    p_max_cols_timestamp     in integer default  5 ,
+    p_max_cols_varchar       in integer default 20 ,
+    p_max_cols_clob          in integer default  5 )
+is
+    v_columns columns_tab;
+begin
+    v_columns := get_columns (
+        p_table_name             => p_table_name             ,
+        p_max_cols_number        => p_max_cols_number        ,
+        p_max_cols_date          => p_max_cols_date          ,
+        p_max_cols_timestamp_ltz => p_max_cols_timestamp_ltz ,
+        p_max_cols_timestamp_tz  => p_max_cols_timestamp_tz  ,
+        p_max_cols_timestamp     => p_max_cols_timestamp     ,
+        p_max_cols_varchar       => p_max_cols_varchar       ,
+        p_max_cols_clob          => p_max_cols_clob          );
+
+    for i in 1 .. v_columns.count loop
+        apex_util.set_session_state (
+            p_name  => v_columns(i).column_alias,
+            p_value => v_columns(i).column_header);
+    end loop;
+end set_session_state;
 
 --------------------------------------------------------------------------------
 
@@ -369,7 +473,7 @@ is
     procedure create_items (
         p_type in varchar2 )
     is
-        v_generic_column varchar2(30);
+        v_column_alias   varchar2(30);
         v_max_cols       pls_integer;
         v_count_n        pls_integer := 0;
         v_count_vc       pls_integer := 0;
@@ -392,13 +496,13 @@ is
 
         for i in 1 .. v_max_cols
         loop
-            v_generic_column := p_type || lpad(to_char(i), 3, '0');
+            v_column_alias   := p_type || lpad(to_char(i), 3, '0');
 
-            if not v_app_items.exists(v_generic_column) then
+            if not v_app_items.exists(v_column_alias  ) then
                 wwv_flow_imp_shared.create_flow_item (
                     p_flow_id          => p_app_id,
                     p_id               => wwv_flow_id.next_val,
-                    p_name             => v_generic_column,
+                    p_name             => v_column_alias  ,
                     p_protection_level => 'I' );
             end if;
         end loop;
@@ -490,7 +594,7 @@ is
             p_include_in_reg_disp_sel_yn  => 'Y',
             p_query_type                  => 'FUNC_BODY_RETURNING_SQL',
             p_function_body_language      => 'PLSQL',
-            p_plug_source                 => 'return model_joel.get_table_query_apex(:your_table_item_here)',
+            p_plug_source                 => 'return model_joel.get_table_query(''CONSOLE_LOGS'')',
             p_plug_source_type            => 'NATIVE_IR',
             p_plug_query_options          => 'DERIVED_REPORT_COLUMNS',
             p_prn_content_disposition     => 'ATTACHMENT',
@@ -548,7 +652,7 @@ is
     procedure create_report_columns (
         p_type in varchar2 )
     is
-        v_generic_column varchar2(30);
+        v_column_alias   varchar2(30);
         v_max_cols       pls_integer;
         v_count_n        pls_integer := 0;
         v_count_vc       pls_integer := 0;
@@ -571,14 +675,14 @@ is
 
         for i in 1 .. v_max_cols
         loop
-            v_generic_column := p_type || lpad(to_char(i), 3, '0');
+            v_column_alias   := p_type || lpad(to_char(i), 3, '0');
 
             wwv_flow_imp_page.create_worksheet_column (
                 p_id                => wwv_flow_id.next_val,
-                p_db_column_name    => v_generic_column,
+                p_db_column_name    => v_column_alias  ,
                 p_display_order     => v_display_order,
-                p_column_identifier => v_generic_column,
-                p_column_label      => '&'||v_generic_column||'.',
+                p_column_identifier => v_column_alias  ,
+                p_column_label      => '&'||v_column_alias  ||'.',
                 p_column_type       => 'STRING',
                 p_use_as_row_header => 'N' );
 
@@ -634,7 +738,7 @@ select name || case when type like '%BODY' then ' body' end as "Name",
 
 prompt - FINISHED
 
---exec apex_session.create_session(103, 1, 'OGOBRECH');
---exec model_joel.create_application_items(103);
---exec model_joel.create_interactive_report(103,1);
+--exec apex_session.create_session(100, 1, 'OGOBRECH');
+--exec model_joel.create_application_items(100);
+--exec model_joel.create_interactive_report(100,1);
 

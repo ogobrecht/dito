@@ -7,12 +7,13 @@ This project is in an early stage...
 
 We have one core package called MODEL and one APEX extension package. It was
 first called MODEL_APEX, but for the [#JoelKallmanDay][1] in 2022 I renamed
-it to MODEL_JOEL. Thank you for this initiative, Tim (@oraclebase). This
+it to MODEL_JOEL. Thank you for this initiative, [Tim (@oraclebase)][2]. This
 project is about data model tools, but Joel was a role model for the APEX
 community, so for me MODEL_JOEL sounds good. And it will remind me always on
 Joel when I am working on this free time open source project...
 
 [1]: https://oracle-base.com/blog/2022/09/27/joel-kallman-day-2022-announcement/
+[2]: https://twitter.com/oraclebase
 
 ## What we have so far
 
