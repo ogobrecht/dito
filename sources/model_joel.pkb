@@ -420,6 +420,7 @@ is
             p_plug_source                 => 'return model_joel.get_table_query(:p'||p_page_id||'_fixme)',
             p_plug_source_type            => 'NATIVE_IR',
             p_plug_query_options          => 'DERIVED_REPORT_COLUMNS',
+            p_plug_column_width           => 'style="overflow:auto;"',
             p_prn_content_disposition     => 'ATTACHMENT',
             p_prn_units                   => 'INCHES',
             p_prn_paper_size              => 'LETTER',
@@ -457,6 +458,7 @@ is
             p_page_id                => p_page_id,
             p_id                     => v_temp_id,
             p_max_row_count          => '1000000',
+            p_max_rows_per_page      => '1000',
             p_pagination_type        => 'ROWS_X_TO_Y',
             p_pagination_display_pos => 'TOP_AND_BOTTOM_LEFT',
             p_show_display_row_count => 'Y',
@@ -475,16 +477,17 @@ is
     procedure create_report_columns (
         p_type in varchar2 )
     is
-        v_column_alias   varchar2(30);
-        v_column_type    varchar2(30);
-        v_max_cols       pls_integer;
-        v_count_n        pls_integer := 0;
-        v_count_vc       pls_integer := 0;
-        v_count_clob     pls_integer := 0;
-        v_count_d        pls_integer := 0;
-        v_count_ts       pls_integer := 0;
-        v_count_tstz     pls_integer := 0;
-        v_count_tsltz    pls_integer := 0;
+        v_column_alias     varchar2(30);
+        v_column_type      varchar2(30);
+        v_column_alignment varchar2(30);
+        v_max_cols         pls_integer;
+        v_count_n          pls_integer := 0;
+        v_count_vc         pls_integer := 0;
+        v_count_clob       pls_integer := 0;
+        v_count_d          pls_integer := 0;
+        v_count_ts         pls_integer := 0;
+        v_count_tstz       pls_integer := 0;
+        v_count_tsltz      pls_integer := 0;
     begin
         v_max_cols :=
             case p_type
@@ -508,6 +511,17 @@ is
                 when 'CLOB'  then 'CLOB'
             end;
 
+        v_column_alignment :=
+            case p_type
+                when 'N'     then 'RIGHT'
+                when 'D'     then 'CENTER'
+                when 'TSLTZ' then 'CENTER'
+                when 'TSTZ'  then 'CENTER'
+                when 'TS'    then 'CENTER'
+                when 'VC'    then 'LEFT'
+                when 'CLOB'  then 'LEFT'
+            end;
+
         for i in 1 .. v_max_cols
         loop
             v_column_alias   := p_type || lpad(to_char(i), 3, '0');
@@ -519,7 +533,7 @@ is
                 p_column_identifier      => v_column_alias  ,
                 p_column_label           => '&'||v_column_alias||'.',
                 p_column_type            => v_column_type,
-                p_column_alignment       => case when p_type = 'N' then 'RIGHT' else 'LEFT' end,
+                p_column_alignment       => v_column_alignment,
                 p_display_condition_type => 'ITEM_IS_NOT_NULL',
                 p_display_condition      => v_column_alias,
                 p_use_as_row_header      => 'N' );
