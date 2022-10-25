@@ -56,14 +56,14 @@ table.
 --------------------------------------------------------------------------------
 
 function get_table_query (
-    p_table_name             in varchar2           ,
-    p_max_cols_number        in integer default 20 ,
-    p_max_cols_date          in integer default  5 ,
-    p_max_cols_timestamp_ltz in integer default  5 ,
-    p_max_cols_timestamp_tz  in integer default  5 ,
-    p_max_cols_timestamp     in integer default  5 ,
-    p_max_cols_varchar       in integer default 20 ,
-    p_max_cols_clob          in integer default  5 )
+    p_table_name             in varchar2            ,
+    p_max_cols_number        in integer  default 20 ,
+    p_max_cols_date          in integer  default  5 ,
+    p_max_cols_timestamp_ltz in integer  default  5 ,
+    p_max_cols_timestamp_tz  in integer  default  5 ,
+    p_max_cols_timestamp     in integer  default  5 ,
+    p_max_cols_varchar       in integer  default 20 ,
+    p_max_cols_clob          in integer  default  5 )
     return varchar2;
 /**
 
@@ -84,14 +84,14 @@ select model_joel.get_table_query(p_table_name => 'CONSOLE_LOGS')
 --------------------------------------------------------------------------------
 
 procedure set_session_state (
-    p_table_name             in varchar2           , -- you can prepend the schema: my_schema.my_table (default is sys_context('USERENV', 'CURRENT_USER'))
-    p_max_cols_number        in integer default 20 ,
-    p_max_cols_date          in integer default  5 ,
-    p_max_cols_timestamp_ltz in integer default  5 ,
-    p_max_cols_timestamp_tz  in integer default  5 ,
-    p_max_cols_timestamp     in integer default  5 ,
-    p_max_cols_varchar       in integer default 20 ,
-    p_max_cols_clob          in integer default  5 );
+    p_table_name             in varchar2            , -- you can prepend the schema: my_schema.my_table (default is sys_context('USERENV', 'CURRENT_USER'))
+    p_max_cols_number        in integer  default 20 ,
+    p_max_cols_date          in integer  default  5 ,
+    p_max_cols_timestamp_ltz in integer  default  5 ,
+    p_max_cols_timestamp_tz  in integer  default  5 ,
+    p_max_cols_timestamp     in integer  default  5 ,
+    p_max_cols_varchar       in integer  default 20 ,
+    p_max_cols_clob          in integer  default  5 );
 /**
 
 set the session state of application items for a given table. The state is then
@@ -159,6 +159,7 @@ end;
 procedure create_interactive_report (
     p_app_id                 in integer            ,
     p_page_id                in integer            ,
+    p_region_name            in varchar2           ,
     p_max_cols_number        in integer default 20 ,
     p_max_cols_date          in integer default  5 ,
     p_max_cols_timestamp_ltz in integer default  5 ,
@@ -217,25 +218,25 @@ type columns_row is record (
     column_alias      varchar2( 30) ,
     column_header     varchar2(128) );
 
-type columns_tab is table of columns_row index by pls_integer;
+type columns_tab is table of columns_row index by binary_integer;
 
 g_table_exists boolean;
 
 --------------------------------------------------------------------------------
 
 function get_columns (
-    p_table_name             in varchar2           ,
-    p_max_cols_number        in integer default 20 ,
-    p_max_cols_date          in integer default  5 ,
-    p_max_cols_timestamp_ltz in integer default  5 ,
-    p_max_cols_timestamp_tz  in integer default  5 ,
-    p_max_cols_timestamp     in integer default  5 ,
-    p_max_cols_varchar       in integer default 20 ,
-    p_max_cols_clob          in integer default  5 )
+    p_table_name             in varchar2            ,
+    p_max_cols_number        in integer  default 20 ,
+    p_max_cols_date          in integer  default  5 ,
+    p_max_cols_timestamp_ltz in integer  default  5 ,
+    p_max_cols_timestamp_tz  in integer  default  5 ,
+    p_max_cols_timestamp     in integer  default  5 ,
+    p_max_cols_varchar       in integer  default 20 ,
+    p_max_cols_clob          in integer  default  5 )
     return columns_tab
 is
     v_column_included   boolean;
-    v_schema_name       varchar2(30);--FIXME set schema name -  default sys_context('USERENV', 'CURRENT_USER'),
+    v_schema_name       varchar2(30);
     v_columns           columns_tab;
     v_index             pls_integer;
     v_column_expression varchar2(200);
@@ -322,8 +323,9 @@ is
     procedure fill_gaps (
         p_type in varchar2 )
     is
-        v_count    pls_integer;
-        v_max_cols pls_integer;
+        v_count      pls_integer;
+        v_max_cols   pls_integer;
+        v_expression varchar2(200);
     begin
         v_count :=
             case p_type
@@ -347,10 +349,22 @@ is
                 when 'CLOB'  then p_max_cols_clob
             end;
 
+        v_expression :=
+            case p_type
+                when 'N'     then 'cast(null as number)'
+                when 'D'     then 'cast(null as date)'
+                when 'TSLTZ' then 'cast(null as timestamp with local time zone)'
+                when 'TSTZ'  then 'cast(null as timestamp with time zone)'
+                when 'TS'    then 'cast(null as timestamp)'
+                when 'VC'    then 'cast(null as varchar2(4000))'
+                when 'CLOB'  then 'to_clob(null)'
+            end;
+
         for i in v_count .. v_max_cols
         loop
             v_index := v_columns.count + 1;
-            v_columns(v_index).column_expression := 'null';
+            --fixme: CAST(NULL AS TIMESTAMP WITH LOCAL TIME ZONE)
+            v_columns(v_index).column_expression := v_expression;
             v_columns(v_index).column_alias      := p_type || lpad(to_char(i), 3, '0');
         end loop;
     end fill_gaps;
@@ -359,6 +373,10 @@ is
 
 begin
     g_table_exists := false;
+
+    v_schema_name := nvl (
+        regexp_substr (p_table_name, '^([a-zA-Z0-9_#$]+)\.', 1, 1, 'i', 1),
+        sys_context('USERENV', 'CURRENT_USER') );
 
     process_table_columns;
 
@@ -377,14 +395,14 @@ end get_columns;
 --------------------------------------------------------------------------------
 
 function get_table_query (
-    p_table_name             in varchar2           ,
-    p_max_cols_number        in integer default 20 ,
-    p_max_cols_date          in integer default  5 ,
-    p_max_cols_timestamp_ltz in integer default  5 ,
-    p_max_cols_timestamp_tz  in integer default  5 ,
-    p_max_cols_timestamp     in integer default  5 ,
-    p_max_cols_varchar       in integer default 20 ,
-    p_max_cols_clob          in integer default  5 )
+    p_table_name             in varchar2            ,
+    p_max_cols_number        in integer  default 20 ,
+    p_max_cols_date          in integer  default  5 ,
+    p_max_cols_timestamp_ltz in integer  default  5 ,
+    p_max_cols_timestamp_tz  in integer  default  5 ,
+    p_max_cols_timestamp     in integer  default  5 ,
+    p_max_cols_varchar       in integer  default 20 ,
+    p_max_cols_clob          in integer  default  5 )
     return varchar2
 is
     v_return        varchar2(32767);
@@ -426,14 +444,14 @@ end get_table_query;
 --------------------------------------------------------------------------------
 
 procedure set_session_state (
-    p_table_name             in varchar2           ,
-    p_max_cols_number        in integer default 20 ,
-    p_max_cols_date          in integer default  5 ,
-    p_max_cols_timestamp_ltz in integer default  5 ,
-    p_max_cols_timestamp_tz  in integer default  5 ,
-    p_max_cols_timestamp     in integer default  5 ,
-    p_max_cols_varchar       in integer default 20 ,
-    p_max_cols_clob          in integer default  5 )
+    p_table_name             in varchar2            ,
+    p_max_cols_number        in integer  default 20 ,
+    p_max_cols_date          in integer  default  5 ,
+    p_max_cols_timestamp_ltz in integer  default  5 ,
+    p_max_cols_timestamp_tz  in integer  default  5 ,
+    p_max_cols_timestamp     in integer  default  5 ,
+    p_max_cols_varchar       in integer  default 20 ,
+    p_max_cols_clob          in integer  default  5 )
 is
     v_columns columns_tab;
 begin
@@ -496,7 +514,7 @@ is
 
         for i in 1 .. v_max_cols
         loop
-            v_column_alias   := p_type || lpad(to_char(i), 3, '0');
+            v_column_alias := p_type || lpad(to_char(i), 3, '0');
 
             if not v_app_items.exists(v_column_alias  ) then
                 wwv_flow_imp_shared.create_flow_item (
@@ -539,15 +557,17 @@ end create_application_items;
 procedure create_interactive_report (
     p_app_id                 in integer            ,
     p_page_id                in integer            ,
-    p_max_cols_number        in integer default 20 ,
-    p_max_cols_date          in integer default  5 ,
-    p_max_cols_timestamp_ltz in integer default  5 ,
-    p_max_cols_timestamp_tz  in integer default  5 ,
-    p_max_cols_timestamp     in integer default  5 ,
-    p_max_cols_varchar       in integer default 20 ,
-    p_max_cols_clob          in integer default  5 )
+    p_region_name            in varchar2           ,
+    p_max_cols_number        in integer  default 20 ,
+    p_max_cols_date          in integer  default  5 ,
+    p_max_cols_timestamp_ltz in integer  default  5 ,
+    p_max_cols_timestamp_tz  in integer  default  5 ,
+    p_max_cols_timestamp     in integer  default  5 ,
+    p_max_cols_varchar       in integer  default 20 ,
+    p_max_cols_clob          in integer  default  5 )
 is
     v_display_order number := 10;
+    v_count         number;
 
     ----------------------------------------
 
@@ -578,6 +598,22 @@ is
 
     ----------------------------------------
 
+    function report_exists return boolean is
+    begin
+        select
+            count(*)
+        into
+            v_count
+        from
+            apex_application_page_regions
+        where
+            application_id = p_app_id
+            and page_id = p_page_id
+            and region_name = p_region_name;
+
+        return case when v_count > 0 then true else false end;
+    end report_exists;
+
     procedure create_report
     is
         v_temp_id number;
@@ -586,7 +622,7 @@ is
             p_flow_id                     => p_app_id,
             p_page_id                     => p_page_id,
             p_id                          => wwv_flow_id.next_val,
-            p_plug_name                   => 'Generic Table Data Report',
+            p_plug_name                   => p_region_name,
             p_region_template_options     => '#DEFAULT#',
             p_component_template_options  => '#DEFAULT#',
             p_plug_template               => get_template_id('Region', 'Interactive Report'),
@@ -594,7 +630,7 @@ is
             p_include_in_reg_disp_sel_yn  => 'Y',
             p_query_type                  => 'FUNC_BODY_RETURNING_SQL',
             p_function_body_language      => 'PLSQL',
-            p_plug_source                 => 'return model_joel.get_table_query(''CONSOLE_LOGS'')',
+            p_plug_source                 => 'return model_joel.get_table_query(:p'||p_page_id||'_fixme)',
             p_plug_source_type            => 'NATIVE_IR',
             p_plug_query_options          => 'DERIVED_REPORT_COLUMNS',
             p_prn_content_disposition     => 'ATTACHMENT',
@@ -635,7 +671,7 @@ is
             p_id                     => v_temp_id,
             p_max_row_count          => '1000000',
             p_pagination_type        => 'ROWS_X_TO_Y',
-            p_pagination_display_pos => 'BOTTOM_RIGHT',
+            p_pagination_display_pos => 'TOP_AND_BOTTOM_LEFT',
             p_show_display_row_count => 'Y',
             p_report_list_mode       => 'TABS',
             p_lazy_loading           => false,
@@ -653,6 +689,7 @@ is
         p_type in varchar2 )
     is
         v_column_alias   varchar2(30);
+        v_column_type    varchar2(30);
         v_max_cols       pls_integer;
         v_count_n        pls_integer := 0;
         v_count_vc       pls_integer := 0;
@@ -673,18 +710,32 @@ is
                 when 'CLOB'  then p_max_cols_clob
             end;
 
+        v_column_type :=
+            case p_type
+                when 'N'     then 'NUMBER'
+                when 'D'     then 'DATE'
+                when 'TSLTZ' then 'DATE'
+                when 'TSTZ'  then 'DATE'
+                when 'TS'    then 'DATE'
+                when 'VC'    then 'STRING'
+                when 'CLOB'  then 'CLOB'
+            end;
+
         for i in 1 .. v_max_cols
         loop
             v_column_alias   := p_type || lpad(to_char(i), 3, '0');
 
             wwv_flow_imp_page.create_worksheet_column (
-                p_id                => wwv_flow_id.next_val,
-                p_db_column_name    => v_column_alias  ,
-                p_display_order     => v_display_order,
-                p_column_identifier => v_column_alias  ,
-                p_column_label      => '&'||v_column_alias  ||'.',
-                p_column_type       => 'STRING',
-                p_use_as_row_header => 'N' );
+                p_id                     => wwv_flow_id.next_val,
+                p_db_column_name         => v_column_alias  ,
+                p_display_order          => v_display_order,
+                p_column_identifier      => v_column_alias  ,
+                p_column_label           => '&'||v_column_alias||'.',
+                p_column_type            => v_column_type,
+                p_column_alignment       => case when p_type = 'N' then 'RIGHT' else 'LEFT' end,
+                p_display_condition_type => 'ITEM_IS_NOT_NULL',
+                p_display_condition      => v_column_alias,
+                p_use_as_row_header      => 'N' );
 
             v_display_order := v_display_order + 10;
         end loop;
@@ -694,14 +745,16 @@ is
 
 begin
 
-    create_report;
-    create_report_columns ( p_type => 'N'     );
-    create_report_columns ( p_type => 'D'     );
-    create_report_columns ( p_type => 'TSLTZ' );
-    create_report_columns ( p_type => 'TSTZ'  );
-    create_report_columns ( p_type => 'TS'    );
-    create_report_columns ( p_type => 'VC'    );
-    create_report_columns ( p_type => 'CLOB'  );
+    if not report_exists then
+        create_report;
+        create_report_columns ( p_type => 'N'     );
+        create_report_columns ( p_type => 'D'     );
+        create_report_columns ( p_type => 'TSLTZ' );
+        create_report_columns ( p_type => 'TSTZ'  );
+        create_report_columns ( p_type => 'TS'    );
+        create_report_columns ( p_type => 'VC'    );
+        create_report_columns ( p_type => 'CLOB'  );
+    end if;
 
 end create_interactive_report;
 
@@ -738,7 +791,7 @@ select name || case when type like '%BODY' then ' body' end as "Name",
 
 prompt - FINISHED
 
---exec apex_session.create_session(100, 1, 'OGOBRECH');
---exec model_joel.create_application_items(100);
---exec model_joel.create_interactive_report(100,1);
+exec apex_session.create_session(103, 1, 'OGOBRECH');
+exec model_joel.create_application_items(103);
+exec model_joel.create_interactive_report(103,1,'Test Report 7');
 

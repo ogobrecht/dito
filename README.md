@@ -28,7 +28,7 @@ Package model_joel with APEX specific functionality:
 
 - A Function to get a query with generic column names for different tables to
   be used in an Interactive Report (this function takes also care of setting
-  application items into session state for use of conditinal display of
+  application items into session state for use of conditional display of
   columns and correct column headers)
 
 ## Installation

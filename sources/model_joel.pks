@@ -13,14 +13,14 @@ table.
 --------------------------------------------------------------------------------
 
 function get_table_query (
-    p_table_name             in varchar2           ,
-    p_max_cols_number        in integer default 20 ,
-    p_max_cols_date          in integer default  5 ,
-    p_max_cols_timestamp_ltz in integer default  5 ,
-    p_max_cols_timestamp_tz  in integer default  5 ,
-    p_max_cols_timestamp     in integer default  5 ,
-    p_max_cols_varchar       in integer default 20 ,
-    p_max_cols_clob          in integer default  5 )
+    p_table_name             in varchar2            ,
+    p_max_cols_number        in integer  default 20 ,
+    p_max_cols_date          in integer  default  5 ,
+    p_max_cols_timestamp_ltz in integer  default  5 ,
+    p_max_cols_timestamp_tz  in integer  default  5 ,
+    p_max_cols_timestamp     in integer  default  5 ,
+    p_max_cols_varchar       in integer  default 20 ,
+    p_max_cols_clob          in integer  default  5 )
     return varchar2;
 /**
 
@@ -41,14 +41,14 @@ select model_joel.get_table_query(p_table_name => 'CONSOLE_LOGS')
 --------------------------------------------------------------------------------
 
 procedure set_session_state (
-    p_table_name             in varchar2           , -- you can prepend the schema: my_schema.my_table (default is sys_context('USERENV', 'CURRENT_USER'))
-    p_max_cols_number        in integer default 20 ,
-    p_max_cols_date          in integer default  5 ,
-    p_max_cols_timestamp_ltz in integer default  5 ,
-    p_max_cols_timestamp_tz  in integer default  5 ,
-    p_max_cols_timestamp     in integer default  5 ,
-    p_max_cols_varchar       in integer default 20 ,
-    p_max_cols_clob          in integer default  5 );
+    p_table_name             in varchar2            , -- you can prepend the schema: my_schema.my_table (default is sys_context('USERENV', 'CURRENT_USER'))
+    p_max_cols_number        in integer  default 20 ,
+    p_max_cols_date          in integer  default  5 ,
+    p_max_cols_timestamp_ltz in integer  default  5 ,
+    p_max_cols_timestamp_tz  in integer  default  5 ,
+    p_max_cols_timestamp     in integer  default  5 ,
+    p_max_cols_varchar       in integer  default 20 ,
+    p_max_cols_clob          in integer  default  5 );
 /**
 
 set the session state of application items for a given table. The state is then
@@ -116,6 +116,7 @@ end;
 procedure create_interactive_report (
     p_app_id                 in integer            ,
     p_page_id                in integer            ,
+    p_region_name            in varchar2           ,
     p_max_cols_number        in integer default 20 ,
     p_max_cols_date          in integer default  5 ,
     p_max_cols_timestamp_ltz in integer default  5 ,
