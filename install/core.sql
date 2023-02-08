@@ -47,23 +47,13 @@ c_url     constant varchar2 (34 byte) := 'https://github.com/ogobrecht/model';
 c_license constant varchar2 ( 3 byte) := 'MIT';
 c_author  constant varchar2 (15 byte) := 'Ottmar Gobrecht';
 
-c_dict_tabs_list constant varchar2 (1000 byte) := '
-    all_tables       ,
-    all_tab_columns  ,
-    all_constraints  ,
-    all_cons_columns ,
-    all_indexes      ,
-    all_ind_columns  ,
-    all_tab_comments ,
-    all_col_comments ,
-';
-
 /**
 
 Oracle Data Model Utilities
 ===========================
 
-PL/SQL utilities to support data model activities like reporting, visualizations...
+PL/SQL utilities to support data model activities like query/mview
+generation, reporting, visualizations...
 
 **/
 
@@ -71,18 +61,14 @@ PL/SQL utilities to support data model activities like reporting, visualizations
 -- PUBLIC MODEL METHODS
 --------------------------------------------------------------------------------
 
-procedure create_dict_mviews (
-    p_dict_tabs_list in varchar2 default c_dict_tabs_list );
+procedure create_or_refresh_mview (
+    p_table_name    in varchar2,
+    p_owner         in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+    p_mview_prefix  in varchar2 default null,
+    p_mview_postfix in varchar2 default '_MV' );
 /**
 
-Create materialized views for data dictionary tables.
-
-The mviews are named like `table_name` + `_mv`.
-
-Per default only mviews for some user_xxx tables are created - also see
-`c_dict_tabs_list` in package signature above.
-
-You can overwrite the default by provide your own data dictionary table list:
+Create or refresh a materialized view for the given table or view name.
 
 EXAMPLES
 
@@ -90,21 +76,15 @@ EXAMPLES
 -- log is written to serveroutput, so we enable it here
 set serveroutput on
 
--- with default data dictionary table list
-exec model.create_dict_mviews;
+-- with default postfix _MV in own schema
+exec model.create_or_refresh_mview('MY_TABLE');
 
--- with custom data dictionary table list
-exec model.create_dict_mviews('all_tables, all_tab_columns');
-
--- works also when you provide the resulting mviev names instead
--- of the table names or when you have line breaks in your list
+-- with custom postfix in foreign schema
 begin
-    model.create_dict_mviews('
-        all_tables_mv       ,
-        all_tab_columns_mv  ,
-        all_constraints_mv  ,
-        all_cons_columns_mv ,
-    ');
+    model.create_or_refresh_mview (
+        p_table_name    => 'USER_TAB_COLUMNS',
+        p_owner         => 'SYS'
+        p_mview_postfix => '_MVIEW' );
 end;
 {{/}}
 ```
@@ -113,33 +93,17 @@ end;
 
 --------------------------------------------------------------------------------
 
-procedure refresh_dict_mviews (
-    p_dict_tabs_list in varchar2 default c_dict_tabs_list );
-
+procedure drop_mview (
+    p_mview_name in varchar2 );
 /**
 
-Refresh the materialized views.
+Drop a materialized view.
 
-Same rules and defaults as for the `create_dict_mviews` method (see above).
+EXAMPLE
 
-If you created a custum set of mviews you should provide the same parameter
-value here for the refresh.
-
-**/
-
---------------------------------------------------------------------------------
-
-procedure drop_dict_mviews (
-    p_dict_tabs_list in varchar2 default c_dict_tabs_list );
-/**
-
-Drop the materialized views.
-
-Same rules and defaults as for the `create_dict_mviews` method (see above).
-
-If you created a custum set of mviews you should provide the same parameter
-value here for the drop.
-
+```sql
+exec model.drop_mview('USER_TAB_COLUMNS_MV');
+```
 **/
 
 --------------------------------------------------------------------------------
@@ -148,7 +112,7 @@ function get_data_default_vc (
     p_dict_tab_name in varchar2,
     p_table_name    in varchar2,
     p_column_name   in varchar2,
-    p_owner         in varchar2 default user )
+    p_owner         in varchar2 default sys_context('USERENV', 'CURRENT_USER') )
     return varchar2;
 /**
 
@@ -165,7 +129,7 @@ USER_NESTED_TABLE_COLS, ALL_NESTED_TABLE_COLS.
 function get_search_condition_vc (
     p_dict_tab_name   in varchar2,
     p_constraint_name in varchar2,
-    p_owner           in varchar2 default user )
+    p_owner           in varchar2 default sys_context('USERENV', 'CURRENT_USER') )
     return varchar2;
 /**
 
@@ -180,7 +144,7 @@ USER_CONSTRAINTS, ALL_CONSTRAINTS
 
 function get_table_query (
     p_table_name  in varchar2,
-    p_schema_name in varchar2 default sys_context('USERENV', 'CURRENT_USER') )
+    p_owner       in varchar2 default sys_context('USERENV', 'CURRENT_USER') )
     return varchar2;
 /**
 
@@ -198,7 +162,7 @@ select model.get_table_query('EMP') from dual;
 
 function get_table_headers (
     p_table_name  in varchar2,
-    p_schema_name in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+    p_owner       in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
     p_delimiter   in varchar2 default ':',
     p_lowercase   in boolean  default true )
     return varchar2;
@@ -237,228 +201,196 @@ end model;
 prompt - Package model (body)
 create or replace package body model is
 
-c_lf                     constant char(1)      := chr(10);
-c_mview_comments_postfix constant varchar2(30) := ', generated by model v';
+c_lf            constant char(1)      := chr(10);
+c_error_code    constant pls_integer  := -20777 ;
+c_assert_prefix constant varchar2(30) := 'Assertion failed: ';
 
 --------------------------------------------------------------------------------
 
-function utl_cleanup_tabs_list (
-    p_tabs_list in varchar2 )
-    return varchar2
+procedure assert (
+    p_expression in boolean  ,
+    p_message    in varchar2 )
 is
 begin
-    return trim(both ',' from regexp_replace(regexp_replace(p_tabs_list, '\s+'), ',{2,}', ','));
-end;
+    if not p_expression then
+        raise_application_error(
+            c_error_code,
+            c_assert_prefix || p_message,
+            true);
+    end if;
+end assert;
 
 --------------------------------------------------------------------------------
 
-function utl_runtime (
+procedure raise_error (
+    p_message    in varchar2 )
+is
+begin
+    raise_application_error(
+        c_error_code,
+        c_assert_prefix || p_message,
+        true);
+end raise_error;
+
+--------------------------------------------------------------------------------
+
+function runtime (
     p_start in timestamp )
     return varchar2
 is
     v_runtime varchar2(30 byte);
 begin
     v_runtime := to_char(localtimestamp - p_start);
-    return substr(v_runtime, instr(v_runtime,':')-2, 15);
-end utl_runtime;
+    return substr(v_runtime, instr(v_runtime,':')+1, 12);
+end runtime;
 
 --------------------------------------------------------------------------------
 
-function utl_runtime_seconds (
-    p_start in timestamp )
-    return number
+procedure create_or_refresh_mview (
+    p_table_name    in varchar2,
+    p_owner         in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+    p_mview_prefix  in varchar2 default null,
+    p_mview_postfix in varchar2 default '_MV' )
 is
-    v_runtime interval day to second;
+    v_mview_name varchar2(32767);
+    v_count      pls_integer;
+    v_code       clob;
+    v_start      timestamp := localtimestamp;
 begin
-    v_runtime := localtimestamp - p_start;
-    return
-        extract(hour   from v_runtime) * 3600 +
-        extract(minute from v_runtime) *   60 +
-        extract(second from v_runtime)        ;
-end utl_runtime_seconds;
+    v_mview_name := p_mview_prefix || p_table_name || p_mview_postfix;
+    assert (
+        length(v_mview_name) <= 128,
+        'The resulting materialized view name is longer then 128 characters (' ||
+            to_char(length(v_mview_name)) ||
+            ' characters: ' ||
+            v_mview_name );
 
---------------------------------------------------------------------------------
+    select count(*)
+      into v_count
+      from user_mviews
+     where mview_name = v_mview_name;
 
-function utl_create_dict_mview (
-    p_table_name in varchar2 )
-    return integer
-is
-    v_table_name varchar2( 1000 byte);
-    v_mview_name varchar2( 1000 byte);
-    v_code       varchar2(32767 byte);
-    v_return     pls_integer := 0;
-begin
-    v_table_name := lower(trim(substr(p_table_name, 1, 1000)));
-    v_mview_name := v_table_name || '_mv';
+    if v_count = 1 then
 
-    for i in (
-        with base as (
-          select table_name, column_name, data_type, data_length
-            from all_tab_cols
-           where owner = 'SYS'
-             and table_name = upper(v_table_name)
-           order by column_id )
-        select table_name,
-               column_name,
-               data_type,
-               data_length,
-               case when data_type = 'LONG' then (
-                 select count(*)
-                   from base
-                  where column_name = t.column_name || '_VC')
-               end as vc_column_exists
-          from base t )
-    loop
-        v_code := v_code || '  ' ||
-            case when i.data_type != 'LONG' then
-                lower(i.column_name) || ',' || c_lf
-            else
-                'to_lob(' || lower(i.column_name) || ') as ' || lower(i.column_name) || ',' || c_lf ||
-                case when i.vc_column_exists = 0 then
-                    case i.column_name
-                        when 'DATA_DEFAULT' then
-                            '  case when data_default is not null then model.get_data_default_vc(p_dict_tab_name=>''' || v_table_name ||
-                            ''',p_table_name=>table_name,p_column_name=>column_name' ||
-                            case when v_table_name like 'all%' then ',p_owner=>owner' end ||
-                            ') end as ' || lower(i.column_name) || '_vc,' || c_lf
-                        when 'SEARCH_CONDITION' then
-                            '  case when search_condition is not null then model.get_search_conditions_vc(p_dict_tab_name=>''' || v_table_name ||
-                            ''',p_table_name=>table_name,p_constraint_name=>constraint_name,p_owner=>owner' ||
-                            ') end as ' || lower(i.column_name) || '_vc,' || c_lf
-                    end
-                end
-            end;
-    end loop;
+        dbms_mview.refresh (
+            list => v_mview_name,
+            method => 'c' );
+        dbms_output.put_line (
+            '- ' || runtime(v_start) ||
+            ' - materialized view refreshed - ' ||
+            v_mview_name );
 
-    if v_code is not null then
-        v_return := 1;
-        v_code   := 'create materialized view ' || v_mview_name
-                        || ' as '                     || c_lf
-                        || 'select'                   || c_lf
-                        || rtrim(v_code, ',' || c_lf) || c_lf
-                        || 'from'                     || c_lf
-                        || '  ' || v_table_name;
-        --dbms_output.put_line(v_code);
-        dbms_output.put_line('- ' || v_mview_name);
-        execute immediate(v_code);
+    else
+
+        select count(*)
+          into v_count
+          from all_tab_columns
+         where owner = p_owner
+           and table_name = p_table_name;
+
+        assert (
+            v_count > 0,
+            'The given table or view is not accessible for the current user or does not exist.' );
+
+        for i in (
+            with base as (
+              select table_name, column_name, data_type, data_length
+                from all_tab_columns
+               where owner = p_owner
+                 and table_name = p_table_name
+               order by column_id )
+            select table_name,
+                   column_name,
+                   data_type,
+                   data_length,
+                   case when data_type = 'LONG' then (
+                     select count(*)
+                       from base
+                      where column_name = t.column_name || '_VC')
+                   end as vc_column_exists
+              from base t )
+        loop
+            v_code := v_code || '  ' ||
+                case
+                    when i.data_type != 'LONG' then
+                        i.column_name || ',' || c_lf
+                    else
+                        'to_lob(' || i.column_name || ') as ' ||
+                        i.column_name || ',' || c_lf ||
+                        case when i.vc_column_exists = 0 then
+                            case i.column_name
+                                when 'DATA_DEFAULT' then
+                                    '  case when data_default is not null then ' ||
+                                    'model.get_data_default_vc(' ||
+                                    'p_dict_tab_name=>''' || p_table_name ||
+                                    ''',p_table_name=>table_name,' ||
+                                    'p_column_name=>column_name' ||
+                                    case
+                                        when p_table_name like 'ALL%' then
+                                            ',p_owner=>owner'
+                                    end ||
+                                    ') end as ' || i.column_name || '_vc,' || c_lf
+                                when 'SEARCH_CONDITION' then
+                                    '  case when search_condition is not null then ' ||
+                                    'model.get_search_conditions_vc(' ||
+                                    'p_dict_tab_name=>''' || p_table_name ||
+                                    ''',p_table_name=>table_name,' ||
+                                    'p_constraint_name=>constraint_name,' ||
+                                    'p_owner=>owner' ||
+                                    ') end as ' || i.column_name || '_vc,' || c_lf
+                            end
+                        end
+                end;
+        end loop;
+
+        if v_code is not null then
+            v_code   := 'create materialized view ' || v_mview_name
+                            || ' as '                     || c_lf
+                            || 'select'                   || c_lf
+                            || rtrim(v_code, ',' || c_lf) || c_lf
+                            || 'from'                     || c_lf
+                            || '  ' || p_table_name;
+            --dbms_output.put_line(v_code);
+            execute immediate(v_code);
+
+        end if;
+
+        dbms_output.put_line (
+            '- ' || runtime(v_start) ||
+            ' - materialized view created - ' || v_mview_name);
     end if;
 
-    return v_return;
-end utl_create_dict_mview;
+
+end create_or_refresh_mview;
 
 --------------------------------------------------------------------------------
 
-procedure create_dict_mviews (
-    p_dict_tabs_list in varchar2 default c_dict_tabs_list )
+procedure drop_mview (
+    p_mview_name in varchar2 )
 is
-    v_start          timestamp   := localtimestamp;
-    v_count          pls_integer := 0;
-    v_dict_tabs_list varchar2(32767 byte);
+    v_count pls_integer;
+    v_sql   varchar2(1000);
+    v_start timestamp := localtimestamp;
 begin
-    dbms_output.put_line('MODEL - CREATE DICT MVIEWS');
-    v_dict_tabs_list := utl_cleanup_tabs_list(p_dict_tabs_list);
 
-    for i in (
-        -- https://blogs.oracle.com/sql/post/split-comma-separated-values-into-rows-in-oracle-database
-        with
-        base as (
-            select v_dict_tabs_list as str
-              from dual ),
-        tabs as (
-             select regexp_replace(upper(trim(regexp_substr(str, '[^,]+', 1, level))), '_MV$') as table_name
-               from base
-            connect by level <= length(str) - length(replace(str, ',')) + 1 )
-        select table_name
-          from tabs
-        minus
-        select regexp_replace(mview_name, '_MV$')
-          from user_mviews
-         where regexp_like(mview_name, '_MV$') )
-    loop
-        v_count := v_count + utl_create_dict_mview(i.table_name);
-    end loop;
+    select count(*)
+      into v_count
+      from user_mviews
+     where mview_name = p_mview_name;
 
-    dbms_output.put_line ( '- ' || v_count || ' mview'
-        || case when v_count != 1 then 's' end
-        || ' created in ' || utl_runtime(v_start) );
+    if v_count = 1 then
+        v_sql := 'drop materialized view ' || p_mview_name;
+        dbms_output.put_line (
+            '- ' || runtime(v_start) ||
+            ' - materialized view dropped - ' || p_mview_name);
+        execute immediate v_sql;
+    else
+        dbms_output.put_line (
+            '- ' || runtime(v_start) ||
+            ' - materialized view does not exist - ' || p_mview_name);
+    end if;
 
-end create_dict_mviews;
-
---------------------------------------------------------------------------------
-
-procedure refresh_dict_mviews (
-    p_dict_tabs_list in varchar2 default c_dict_tabs_list )
-is
-    v_start          timestamp   := localtimestamp;
-    v_count          pls_integer := 0;
-    v_dict_tabs_list varchar2(32767 byte);
-begin
-    dbms_output.put_line('MODEL - REFRESH DICT MVIEWS');
-    v_dict_tabs_list := utl_cleanup_tabs_list(p_dict_tabs_list);
-
-    for i in (
-        with
-        base as (
-            select v_dict_tabs_list as str
-              from dual ),
-        tabs as (
-            select regexp_replace(upper(trim(regexp_substr(str, '[^,]+', 1, level))), '_MV$') as table_name
-              from base
-           connect by level <= length(str) - length(replace(str, ',')) + 1 ),
-        expected_mviews as (
-            select table_name || '_MV' as mview_name
-              from tabs )
-        select mview_name
-          from expected_mviews natural join user_mviews )
-    loop
-        dbms_output.put_line('- ' || lower(i.mview_name));
-        dbms_mview.refresh(list => i.mview_name, method => 'c');
-        v_count := v_count + 1;
-    end loop;
-
-    dbms_output.put_line ( '- ' || v_count || ' mview'
-        || case when v_count != 1 then 's' end
-        || ' refreshed in ' || utl_runtime(v_start) );
-end refresh_dict_mviews;
-
---------------------------------------------------------------------------------
-
-procedure drop_dict_mviews (
-    p_dict_tabs_list in varchar2 default c_dict_tabs_list )
-is
-    v_start          timestamp   := localtimestamp;
-    v_count          pls_integer := 0;
-    v_dict_tabs_list varchar2(32767 byte);
-begin
-    dbms_output.put_line('MODEL - DROP DICT MVIEWS');
-    v_dict_tabs_list := utl_cleanup_tabs_list(p_dict_tabs_list);
-
-    for i in (
-        with
-        base as (
-            select v_dict_tabs_list as str
-              from dual ),
-        tabs as (
-            select regexp_replace(upper(trim(regexp_substr(str, '[^,]+', 1, level))), '_MV$') as table_name
-              from base
-           connect by level <= length(str) - length(replace(str, ',')) + 1 ),
-        expected_mviews as (
-            select table_name || '_MV' as mview_name
-              from tabs )
-        select mview_name
-          from expected_mviews natural join user_mviews )
-    loop
-        dbms_output.put_line('- ' || lower(i.mview_name));
-        execute immediate 'drop materialized view ' || i.mview_name;
-        v_count := v_count + 1;
-    end loop;
-
-    dbms_output.put_line ( '- '
-        || v_count
-        || ' mview'
-        || case when v_count != 1 then 's' end
-        || ' dropped in ' || utl_runtime(v_start) );
-end drop_dict_mviews;
+end drop_mview;
 
 --------------------------------------------------------------------------------
 
@@ -466,7 +398,7 @@ function get_data_default_vc (
     p_dict_tab_name varchar2,
     p_table_name    varchar2,
     p_column_name   varchar2,
-    p_owner         varchar2 default user)
+    p_owner         varchar2 default sys_context('USERENV', 'CURRENT_USER') )
     return varchar2
 is
     v_long long;
@@ -478,7 +410,7 @@ begin
               from user_tab_columns
              where table_name  = upper(p_table_name)
                and column_name = upper(p_column_name);
-        when upper(p_dict_tab_name) in ('ALL_TAB_COLUMNS', 'ALL_TAB_COLS') then
+        when upper(p_dict_tab_name) in ('ALL_TAB_COLUMNS', 'ALL_TAB_COLUMNS') then
             select data_default
               into v_long
               from all_tab_columns
@@ -499,7 +431,7 @@ begin
                and table_name  = upper(p_table_name)
                and column_name = upper(p_column_name);
         else
-            raise_application_error(-20999, 'Unsupported dictionary table ' || p_dict_tab_name);
+            raise_error('Unsupported dictionary table ' || p_dict_tab_name);
     end case;
 
     return substr(v_long, 1, 4000);
@@ -510,7 +442,7 @@ end get_data_default_vc;
 function get_search_condition_vc (
     p_dict_tab_name   in varchar2,
     p_constraint_name in varchar2,
-    p_owner           in varchar2 default user )
+    p_owner           in varchar2 default sys_context('USERENV', 'CURRENT_USER') )
     return varchar2
 is
     v_long long;
@@ -527,7 +459,7 @@ begin
              where owner = p_owner
                and constraint_name = upper(p_constraint_name);
         else
-        raise_application_error(-20999, 'Unsupported dictionary table ' || p_dict_tab_name);
+        raise_error('Unsupported dictionary table ' || p_dict_tab_name);
     end case;
 
     return substr(v_long, 1, 4000);
@@ -537,14 +469,14 @@ end get_search_condition_vc;
 
 function get_table_query (
     p_table_name  in varchar2,
-    p_schema_name in varchar2 default sys_context('USERENV', 'CURRENT_USER') )
+    p_owner       in varchar2 default sys_context('USERENV', 'CURRENT_USER') )
     return varchar2
 is
     v_return varchar2( 32767 ) := 'select ';
 begin
     for i in ( select *
                  from all_tab_columns
-                where owner      = p_schema_name
+                where owner      = p_owner
                   and table_name = p_table_name
                 order by column_id )
     loop
@@ -558,7 +490,7 @@ end get_table_query;
 
 function get_table_headers (
     p_table_name  in varchar2,
-    p_schema_name in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+    p_owner       in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
     p_delimiter   in varchar2 default ':',
     p_lowercase   in boolean  default true )
     return varchar2
@@ -567,12 +499,12 @@ is
 begin
     for i in ( select *
                  from all_tab_columns
-                where owner      = p_schema_name
+                where owner      = p_owner
                   and table_name = p_table_name
                 order by column_id )
     loop
         v_return := v_return
-            || case when p_lowercase then lower(i.column_name) else i.column_name end
+            || case when p_lowercase then i.column_name else i.column_name end
             || p_delimiter;
   end loop;
 

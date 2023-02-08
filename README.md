@@ -26,10 +26,8 @@ Package model:
 
 Package model_joel with APEX specific functionality:
 
-- A Function to get a query with generic column names for different tables to
-  be used in an Interactive Report (this function takes also care of setting
-  application items into session state for use of conditional display of
-  columns and correct column headers)
+- Procedures and functions to support the usage of an Interactive Report as a
+  generic data viewer for different tables and views
 
 ## Installation
 
@@ -54,6 +52,10 @@ package.
 
 ## Changelog
 
+- 0.7.0 (2023-xx-xx):
+  - Remove model.create_dict_mviews and refresh_dict_mviews
+  - Add model.create_or_refresh_mview
+  - Improve APEX Interactive Report support in model_joel
 - 0.6.0 (2022-10-05): Rename package back to model, add APEX extension package (model_joel)
 - 0.5.0 (2022-10-02): Rename package from model to dito, rework project structure
 - 0.4.0 (2022-03-05): New methods get_table_query and get_table_headers

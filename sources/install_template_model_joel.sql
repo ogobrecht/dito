@@ -7,7 +7,8 @@ set trimout on
 set trimspool on
 whenever sqlerror exit sql.sqlcode rollback
 
-exec model.create_dict_mviews('all_tab_columns');
+prompt CREATE OR REFRESH NEEDED MVIEW
+exec model.create_or_refresh_mview('ALL_TAB_COLUMNS', 'SYS');
 prompt
 prompt ORACLE DATA MODEL UTILITIES - CREATE APEX EXTENSION PACKAGE
 prompt - Project page https://github.com/ogobrecht/model

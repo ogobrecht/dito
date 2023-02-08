@@ -33,23 +33,36 @@ columns.
 EXAMPLE
 
 ```sql
+-- with defaults
 select model_joel.get_table_query(p_table_name => 'CONSOLE_LOGS')
   from dual;
+
+-- with custom settings
+select model_joel.get_table_query (
+    p_table_name             => 'CONSOLE_LOGS',
+    p_max_cols_number        =>  40 ,
+    p_max_cols_date          =>  10 ,
+    p_max_cols_timestamp_ltz =>  10 ,
+    p_max_cols_timestamp_tz  =>  10 ,
+    p_max_cols_timestamp     =>  10 ,
+    p_max_cols_varchar       =>  60 ,
+    p_max_cols_clob          =>  10 );
 ```
 
 SIGNATURE
 
 ```sql
 function get_table_query (
-    p_table_name             in varchar2            ,
-    p_max_cols_number        in integer  default 20 ,
-    p_max_cols_date          in integer  default  5 ,
-    p_max_cols_timestamp_ltz in integer  default  5 ,
-    p_max_cols_timestamp_tz  in integer  default  5 ,
-    p_max_cols_timestamp     in integer  default  5 ,
-    p_max_cols_varchar       in integer  default 20 ,
-    p_max_cols_clob          in integer  default  5 )
-    return varchar2;
+    p_table_name             in varchar2              ,
+    p_owner                  in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
+    p_max_cols_number        in integer  default   20 ,
+    p_max_cols_date          in integer  default    5 ,
+    p_max_cols_timestamp_ltz in integer  default    5 ,
+    p_max_cols_timestamp_tz  in integer  default    5 ,
+    p_max_cols_timestamp     in integer  default    5 ,
+    p_max_cols_varchar       in integer  default   20 ,
+    p_max_cols_clob          in integer  default    5 )
+    return clob;
 ```
 
 
@@ -61,21 +74,36 @@ used for conditional display of report columns as well for the report headers.
 EXAMPLE
 
 ```sql
+-- with defaults
 model_joel.set_session_state(p_table_name => 'CONSOLE_LOGS');
+
+-- with custom settings
+model_joel.set_session_state (
+    p_table_name             => 'CONSOLE_LOGS' ,
+    p_max_cols_number        =>  40 ,
+    p_max_cols_date          =>  10 ,
+    p_max_cols_timestamp_ltz =>  10 ,
+    p_max_cols_timestamp_tz  =>  10 ,
+    p_max_cols_timestamp     =>  10 ,
+    p_max_cols_varchar       =>  60 ,
+    p_max_cols_clob          =>  10 );
 ```
 
 SIGNATURE
 
 ```sql
 procedure set_session_state (
-    p_table_name             in varchar2            , -- you can prepend the schema: my_schema.my_table (default is sys_context('USERENV', 'CURRENT_USER'))
-    p_max_cols_number        in integer  default 20 ,
-    p_max_cols_date          in integer  default  5 ,
-    p_max_cols_timestamp_ltz in integer  default  5 ,
-    p_max_cols_timestamp_tz  in integer  default  5 ,
-    p_max_cols_timestamp     in integer  default  5 ,
-    p_max_cols_varchar       in integer  default 20 ,
-    p_max_cols_clob          in integer  default  5 );
+    p_table_name             in varchar2              ,
+    p_owner                  in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
+    p_max_cols_number        in integer  default   20 ,
+    p_max_cols_date          in integer  default    5 ,
+    p_max_cols_timestamp_ltz in integer  default    5 ,
+    p_max_cols_timestamp_tz  in integer  default    5 ,
+    p_max_cols_timestamp     in integer  default    5 ,
+    p_max_cols_varchar       in integer  default   20 ,
+    p_max_cols_clob          in integer  default    5 ,
+    p_item_column_names      in varchar2 default null ,
+    p_item_messages          in varchar2 default null );
 ```
 
 
@@ -109,8 +137,10 @@ begin
         p_max_cols_timestamp_ltz =>  10 ,
         p_max_cols_timestamp_tz  =>  10 ,
         p_max_cols_timestamp     =>  10 ,
-        p_max_cols_varchar       =>  40 ,
+        p_max_cols_varchar       =>  60 ,
         p_max_cols_clob          =>  10 );
+
+    commit;
 end;
 /
 ```
@@ -156,13 +186,16 @@ begin
     model_joel.create_interactive_report (
         p_app_id                 => 100 ,
         p_page_id                =>   1 ,
+        p_region_name            => 'Data',
         p_max_cols_number        =>  40 ,
         p_max_cols_date          =>  10 ,
         p_max_cols_timestamp_ltz =>  10 ,
         p_max_cols_timestamp_tz  =>  10 ,
         p_max_cols_timestamp     =>  10 ,
-        p_max_cols_varchar       =>  40 ,
+        p_max_cols_varchar       =>  60 ,
         p_max_cols_clob          =>  10 );
+
+    commit;
 end;
 /
 ```

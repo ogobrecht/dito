@@ -12,18 +12,18 @@ g_table_exists boolean;
 --------------------------------------------------------------------------------
 
 function get_columns (
-    p_table_name             in varchar2            ,
-    p_max_cols_number        in integer  default 20 ,
-    p_max_cols_date          in integer  default  5 ,
-    p_max_cols_timestamp_ltz in integer  default  5 ,
-    p_max_cols_timestamp_tz  in integer  default  5 ,
-    p_max_cols_timestamp     in integer  default  5 ,
-    p_max_cols_varchar       in integer  default 20 ,
-    p_max_cols_clob          in integer  default  5 )
+    p_table_name             in varchar2              ,
+    p_owner                  in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
+    p_max_cols_number        in integer  default   20 ,
+    p_max_cols_date          in integer  default    5 ,
+    p_max_cols_timestamp_ltz in integer  default    5 ,
+    p_max_cols_timestamp_tz  in integer  default    5 ,
+    p_max_cols_timestamp     in integer  default    5 ,
+    p_max_cols_varchar       in integer  default   20 ,
+    p_max_cols_clob          in integer  default    5 )
     return columns_tab
 is
     v_column_included   boolean;
-    v_schema_name       varchar2(30);
     v_columns           columns_tab;
     v_index             pls_integer;
     v_column_expression varchar2(200);
@@ -48,7 +48,7 @@ is
             from
                 all_tab_columns_mv
             where
-                owner = v_schema_name
+                owner          = p_owner
                 and table_name = p_table_name
             order by
                 column_id )
@@ -161,10 +161,6 @@ is
 begin
     g_table_exists := false;
 
-    v_schema_name := nvl (
-        regexp_substr (p_table_name, '^([a-zA-Z0-9_#$]+)\.', 1, 1, 'i', 1),
-        sys_context('USERENV', 'CURRENT_USER') );
-
     process_table_columns;
 
     fill_gaps ( p_type => 'N'     );
@@ -182,17 +178,18 @@ end get_columns;
 --------------------------------------------------------------------------------
 
 function get_table_query (
-    p_table_name             in varchar2            ,
-    p_max_cols_number        in integer  default 20 ,
-    p_max_cols_date          in integer  default  5 ,
-    p_max_cols_timestamp_ltz in integer  default  5 ,
-    p_max_cols_timestamp_tz  in integer  default  5 ,
-    p_max_cols_timestamp     in integer  default  5 ,
-    p_max_cols_varchar       in integer  default 20 ,
-    p_max_cols_clob          in integer  default  5 )
-    return varchar2
+    p_table_name             in varchar2              ,
+    p_owner                  in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
+    p_max_cols_number        in integer  default   20 ,
+    p_max_cols_date          in integer  default    5 ,
+    p_max_cols_timestamp_ltz in integer  default    5 ,
+    p_max_cols_timestamp_tz  in integer  default    5 ,
+    p_max_cols_timestamp     in integer  default    5 ,
+    p_max_cols_varchar       in integer  default   20 ,
+    p_max_cols_clob          in integer  default    5 )
+    return clob
 is
-    v_return        varchar2(32767);
+    v_return        clob;
     v_columns       columns_tab;
     v_sep           varchar2(2) := ',' || chr(10);
     v_column_indent varchar2(7) := '       ';
@@ -208,9 +205,6 @@ begin
         p_max_cols_clob          => p_max_cols_clob          );
 
     for i in 1 .. v_columns.count loop
-        apex_util.set_session_state (
-            p_name  => v_columns(i).column_alias,
-            p_value => v_columns(i).column_header);
         v_return := v_return
             || v_column_indent
             || v_columns(i).column_expression
@@ -219,11 +213,11 @@ begin
             || v_sep;
     end loop;
 
-    v_return :=    'select ' || rtrim( ltrim(v_return), v_sep ) || chr(10)
-                || '  from ' || case when g_table_exists
-                                    then p_table_name
-                                    else 'dual'
-                                end;
+    v_return := 'select ' || rtrim( ltrim(v_return), v_sep ) || chr(10) ||
+                '  from ' || case when g_table_exists
+                                  then p_table_name
+                                  else 'dual'
+                             end;
 
     return v_return;
 end get_table_query;
@@ -231,19 +225,24 @@ end get_table_query;
 --------------------------------------------------------------------------------
 
 procedure set_session_state (
-    p_table_name             in varchar2            ,
-    p_max_cols_number        in integer  default 20 ,
-    p_max_cols_date          in integer  default  5 ,
-    p_max_cols_timestamp_ltz in integer  default  5 ,
-    p_max_cols_timestamp_tz  in integer  default  5 ,
-    p_max_cols_timestamp     in integer  default  5 ,
-    p_max_cols_varchar       in integer  default 20 ,
-    p_max_cols_clob          in integer  default  5 )
+    p_table_name             in varchar2              ,
+    p_owner                  in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
+    p_max_cols_number        in integer  default   20 ,
+    p_max_cols_date          in integer  default    5 ,
+    p_max_cols_timestamp_ltz in integer  default    5 ,
+    p_max_cols_timestamp_tz  in integer  default    5 ,
+    p_max_cols_timestamp     in integer  default    5 ,
+    p_max_cols_varchar       in integer  default   20 ,
+    p_max_cols_clob          in integer  default    5 ,
+    p_item_column_names      in varchar2 default null ,
+    p_item_messages          in varchar2 default null )
 is
-    v_columns columns_tab;
+    v_columns_tab columns_tab;
+    v_columns_csv varchar2(32767);
 begin
-    v_columns := get_columns (
+    v_columns_tab := get_columns (
         p_table_name             => p_table_name             ,
+        p_owner                  => p_owner                  ,
         p_max_cols_number        => p_max_cols_number        ,
         p_max_cols_date          => p_max_cols_date          ,
         p_max_cols_timestamp_ltz => p_max_cols_timestamp_ltz ,
@@ -252,11 +251,20 @@ begin
         p_max_cols_varchar       => p_max_cols_varchar       ,
         p_max_cols_clob          => p_max_cols_clob          );
 
-    for i in 1 .. v_columns.count loop
+    for i in 1 .. v_columns_tab.count loop
         apex_util.set_session_state (
-            p_name  => v_columns(i).column_alias,
-            p_value => v_columns(i).column_header);
+            p_name  => v_columns_tab(i).column_alias,
+            p_value => v_columns_tab(i).column_header);
+        if v_columns_tab(i).column_header is not null then
+            v_columns_csv := v_columns_csv || v_columns_tab(i).column_alias || ',';
+        end if;
     end loop;
+
+    if p_item_column_names is not null then
+        apex_util.set_session_state (
+            p_name  => p_item_column_names,
+            p_value => rtrim(v_columns_csv, ',') );
+    end if;
 end set_session_state;
 
 --------------------------------------------------------------------------------
@@ -458,7 +466,9 @@ is
             p_page_id                => p_page_id,
             p_id                     => v_temp_id,
             p_max_row_count          => '1000000',
+            p_no_data_found_message  => 'No data found.',
             p_max_rows_per_page      => '1000',
+            p_allow_report_saving    => 'N',
             p_pagination_type        => 'ROWS_X_TO_Y',
             p_pagination_display_pos => 'TOP_AND_BOTTOM_LEFT',
             p_show_display_row_count => 'Y',
@@ -466,6 +476,7 @@ is
             p_lazy_loading           => false,
             p_show_detail_link       => 'N',
             p_show_notify            => 'Y',
+            p_show_reset             => 'N',
             p_download_formats       => 'CSV:HTML:XLSX:PDF',
             p_enable_mail_download   => 'Y',
             p_owner                  => apex_application.g_user,
