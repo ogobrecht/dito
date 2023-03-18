@@ -45,7 +45,7 @@ select model_joel.get_table_query (
     p_max_cols_timestamp_ltz =>  10 ,
     p_max_cols_timestamp_tz  =>  10 ,
     p_max_cols_timestamp     =>  10 ,
-    p_max_cols_varchar       =>  60 ,
+    p_max_cols_varchar       =>  80 ,
     p_max_cols_clob          =>  10 );
 ```
 
@@ -84,7 +84,7 @@ model_joel.set_session_state (
     p_max_cols_timestamp_ltz =>  10 ,
     p_max_cols_timestamp_tz  =>  10 ,
     p_max_cols_timestamp     =>  10 ,
-    p_max_cols_varchar       =>  60 ,
+    p_max_cols_varchar       =>  80 ,
     p_max_cols_clob          =>  10 );
 ```
 
@@ -131,10 +131,10 @@ begin
         p_max_cols_timestamp_ltz =>  10 ,
         p_max_cols_timestamp_tz  =>  10 ,
         p_max_cols_timestamp     =>  10 ,
-        p_max_cols_varchar       =>  60 ,
+        p_max_cols_varchar       =>  80 ,
         p_max_cols_clob          =>  10 );
 
-    commit;
+    commit; --SEC:OK
 end;
 {{/}}
 ```
@@ -186,15 +186,16 @@ begin
         p_max_cols_timestamp_ltz =>  10 ,
         p_max_cols_timestamp_tz  =>  10 ,
         p_max_cols_timestamp     =>  10 ,
-        p_max_cols_varchar       =>  60 ,
+        p_max_cols_varchar       =>  80 ,
         p_max_cols_clob          =>  10 );
 
-    commit;
+    commit; --SEC:OK
 end;
 {{/}}
 ```
 
 **/
+
 --------------------------------------------------------------------------------
 
 end model_joel;
