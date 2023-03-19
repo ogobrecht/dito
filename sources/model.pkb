@@ -605,14 +605,8 @@ function to_regexp_like (
     return varchar2 deterministic
 is
     l_return       varchar2(32767) := p_like;
-    l_has_brackets boolean         := false;
     l_has_commas   boolean         := false;
 begin
-    -- check for brackets
-    if instr(l_return, '(') > 0 then
-        l_has_brackets := true;
-    end if;
-
     -- process comma
     if instr(l_return, ',') > 0 then
         l_has_commas := true;
@@ -625,8 +619,11 @@ begin
     -- process percent
     l_return := replace(l_return, '%', '.*');
 
+    -- escape $
+    l_return := replace(l_return, '$', '\$');
+
     -- process multiple like pattern
-    if l_has_commas and not l_has_brackets then
+    if l_has_commas then
         l_return := '(' || l_return || ')';
     end if;
 
