@@ -1,5 +1,5 @@
 {
-  "name": "model",
+  "name": "oracle-dictionary-tools",
   "license": "MIT",
   "private": true,
   "repository": {
@@ -7,16 +7,17 @@
     "url": "https://github.com/ogobrecht/model.git"
   },
   "scripts": {
-    "watch": "chokidar src/*.* --initial --command \"npm run build\"",
-    "prebuild": "npx ploc --in src/MODEL.pks --out README.md",
-    "build": "node src/build.js",
-    "postbuild": "echo exit | sqlplus -S /@playground @install.sql",
-    "uninstall": "echo exit | sqlplus -S /@playground @uninstall.sql"
+    "watch": "chokidar sources/*.* --initial --command \"npm run build\"",
+    "prebuild": "npx ploc --debug --in \"sources/*.pks\" --out \"docs/{file}.md\"",
+    "build": "node sources/build.js",
+    "postbuild": "echo exit | sqlplus -S /@playground @install/core.sql && echo exit | sqlplus -S /@playground @install/apex_extension.sql",
+    "uninstall": "echo exit | sqlplus -S /@playground @uninstall/model_packages.sql"
   },
   "devDependencies": {
     "chokidar-cli": "^3.0.0",
-    "glob": "^7.2.0",
+    "glob": "^8.0.3",
     "markdown-toc": "^1.2.0",
+    "npm-check-updates": "^16.3.7",
     "npm-run-all": "^4.1.5",
     "ploc": "^0.8.0"
   }

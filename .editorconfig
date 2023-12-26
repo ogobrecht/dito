@@ -11,7 +11,7 @@ trim_trailing_whitespace = false
 
 [*.{sql,pks,pkb,json}]
 indent_style = space
-indent_size = 2
+indent_size = 4
 
 [*.{sql,pks,pkb,json,md,txt,bat}]
 charset = utf-8
