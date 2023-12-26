@@ -7,13 +7,12 @@ set trimout on
 set trimspool on
 whenever sqlerror exit sql.sqlcode rollback
 
-prompt ORACLE DATA MODEL UTILITIES - CREATE CORE PACKAGE
-prompt - Project page https://github.com/ogobrecht/model
+exec dbms_output.put_line( 'ORACLE DATA MODEL UTILITIES - CREATE CORE PACKAGE' );
+exec dbms_output.put_line( '- Project page https://github.com/ogobrecht/model' );
 @set_ccflags.sql
-prompt - Package model (spec)
+exec dbms_output.put_line( '- Package model (spec)' );
 @model.pks
-prompt - Package model (body)
+exec dbms_output.put_line( '- Package model (body)' );
 @model.pkb
 @show_errors_model.sql
 @log_installed_version.sql
-

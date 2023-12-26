@@ -7,6 +7,7 @@ Oracle Data Model Utilities
 - [Package model](#package-model)
 - [Procedure create_or_refresh_mview](#procedure-create_or_refresh_mview)
 - [Procedure drop_mview](#procedure-drop_mview)
+- [Procedure create_index](#procedure-create_index)
 - [Function get_table_comments](#function-get_table_comments)
 - [Function get_column_comments](#function-get_column_comments)
 - [Function get_number_of_rows](#function-get_number_of_rows)
@@ -31,7 +32,7 @@ SIGNATURE
 package model authid current_user is
 
 c_name    constant varchar2 (30 byte) := 'Oracle Data Model Utilities';
-c_version constant varchar2 (10 byte) := '0.6.3';
+c_version constant varchar2 (10 byte) := '0.7.3';
 c_url     constant varchar2 (34 byte) := 'https://github.com/ogobrecht/model';
 c_license constant varchar2 ( 3 byte) := 'MIT';
 c_author  constant varchar2 (15 byte) := 'Ottmar Gobrecht';
@@ -88,6 +89,27 @@ SIGNATURE
 ```sql
 procedure drop_mview (
     p_mview_name in varchar2 );
+```
+
+
+## Procedure create_index
+
+Create an index on a table or materialized view.
+
+EXAMPLE
+
+```sql
+exec model.create_index('ALL_TABLES_MV', 'IDX1', 'OWNER, TABLE_NAME');
+```
+
+SIGNATURE
+
+```sql
+procedure create_index (
+    p_table_name in varchar2,
+    p_postfix    in varchar2,
+    p_columns    in varchar2,
+    p_unique     in boolean default false );
 ```
 
 
@@ -248,13 +270,13 @@ function get_table_headers (
 
 ## Function to_regexp_like
 
-Convert one or multiple, comma separated like pattern to a regexp_like pattern.
+Convert one or multiple, space separated like pattern to a regexp_like pattern.
 
 EXAMPLE
 
 ```sql
-select to_regexp_like('emp%,dept,%sal,star*') from dual;
-       --> returns '(emp.*|dept|.*sal|star.*)'
+select to_regexp_like('emp% dept some*name other$name') from dual;
+       --> returns '(emp.*|dept|some.*name|other\$name)'
 ```
 
 SIGNATURE

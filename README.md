@@ -9,8 +9,8 @@ We have one core package called MODEL and one APEX extension package. It was
 first called MODEL_APEX, but for the [#JoelKallmanDay][1] in 2022 I renamed
 it to MODEL_JOEL. Thank you for this initiative, [Tim (@oraclebase)][2]. This
 project is about data model tools, but Joel was a role model for the APEX
-community, so for me MODEL_JOEL sounds good. And it will remind me always on
-Joel when I am working on this free time open source project...
+community, so MODEL_JOEL sounds good to me. And it will always remind me of
+Joel when I work on this open source project in my spare time...
 
 [1]: https://oracle-base.com/blog/2022/09/27/joel-kallman-day-2022-announcement/
 [2]: https://twitter.com/oraclebase
@@ -52,7 +52,7 @@ package.
 
 ## Changelog
 
-- 0.7.0 (2023-xx-xx):
+- 0.7.3 (2023-12-26):
   - Remove model.create_dict_mviews and refresh_dict_mviews
   - Add model.create_or_refresh_mview
   - Improve APEX Interactive Report support in model_joel

@@ -97,11 +97,10 @@ begin
 
         for i in (
             with base as (
-              select owner, table_name, column_name, data_type, data_length
+              select owner, table_name, column_name, data_type, data_length, column_id
                 from all_tab_columns
                where owner = p_owner
-                 and table_name = p_table_name
-               order by column_id )
+                 and table_name = p_table_name )
             select owner,
                    table_name,
                    column_name,
@@ -112,7 +111,8 @@ begin
                        from base
                       where column_name = t.column_name || '_VC')
                    end as vc_column_exists
-              from base t )
+              from base t
+             order by column_id )
         loop
             -- convert LONG columns to CLOB
             if i.data_type != 'LONG' then
@@ -324,6 +324,38 @@ begin
                                   ' is ''' || replace(l_comments(i).comments,'''', '''''')  || '''';
             end loop;
 
+            -- add indexes in case of SYS tables
+            if p_owner = 'SYS' then
+                case p_table_name
+                    when 'ALL_TABLES'       then
+                        create_index(l_mview_name, 'IDX1', 'OWNER,TABLE_NAME');
+                    when 'ALL_TAB_COLUMNS'  then
+                        create_index(l_mview_name, 'IDX1', 'OWNER,TABLE_NAME,COLUMN_NAME,COLUMN_ID');
+                    when 'ALL_CONSTRAINTS'  then
+                        create_index(l_mview_name, 'IDX1', 'OWNER,CONSTRAINT_NAME,STATUS');
+                        create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME,STATUS');
+                    when 'ALL_CONS_COLUMNS' then
+                        create_index(l_mview_name, 'IDX1', 'OWNER,CONSTRAINT_NAME');
+                        create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME,COLUMN_NAME');
+                    when 'ALL_INDEXES'      then
+                        create_index(l_mview_name, 'IDX1', 'OWNER,INDEX_NAME');
+                        create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME');
+                    when 'ALL_IND_COLUMNS'  then
+                        create_index(l_mview_name, 'IDX1', 'INDEX_OWNER,INDEX_NAME,COLUMN_NAME');
+                    when 'ALL_OBJECTS'      then
+                        create_index(l_mview_name, 'IDX1', 'OWNER,OBJECT_NAME,OBJECT_TYPE');
+                    when 'ALL_DEPENDENCIES' then
+                        create_index(l_mview_name, 'IDX1', 'OWNER,NAME');
+                        create_index(l_mview_name, 'IDX2', 'REFERENCED_OWNER,REFERENCED_NAME');
+                    when 'ALL_VIEWS'        then
+                        create_index(l_mview_name, 'IDX1', 'OWNER,VIEW_NAME');
+                    when 'ALL_TRIGGERS'     then
+                        create_index(l_mview_name, 'IDX1', 'OWNER,TRIGGER_NAME');
+                        create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME');
+                    else
+                        null;
+                end case;
+            end if;
         end if;
 
         dbms_output.put_line (
@@ -364,6 +396,23 @@ end drop_mview;
 
 --------------------------------------------------------------------------------
 
+procedure create_index (
+    p_table_name in varchar2,
+    p_postfix    in varchar2,
+    p_columns    in varchar2,
+    p_unique     in boolean default false )
+is
+    l_ddl varchar2(32767);
+begin
+    l_ddl := 'create ' || case when p_unique then 'unique ' end ||
+        'index ' || p_table_name || '_' || p_postfix || ' on ' ||
+        p_table_name || ' (' || p_columns || ')';
+    --dbms_output.put_line ('- ' || l_ddl);
+    execute immediate l_ddl;
+end;
+
+--------------------------------------------------------------------------------
+
 function get_table_comments (
     p_table_name in varchar2,
     p_owner      in varchar2 default sys_context('USERENV', 'CURRENT_USER') )
@@ -382,7 +431,6 @@ exception
     when no_data_found
         then return null;
 end get_table_comments;
-
 
 --------------------------------------------------------------------------------
 
@@ -604,13 +652,13 @@ function to_regexp_like (
     p_like  in varchar2 )
     return varchar2 deterministic
 is
-    l_return       varchar2(32767) := p_like;
-    l_has_commas   boolean         := false;
+    l_return    varchar2(32767) := p_like;
+    l_has_space boolean         := false;
 begin
-    -- process comma
-    if instr(l_return, ',') > 0 then
-        l_has_commas := true;
-        l_return     := regexp_replace(l_return, '\s*,\s*', '|');
+    -- process space
+    if instr(l_return, ' ') > 0 then
+        l_has_space := true;
+        l_return    := regexp_replace(l_return, '\s+', '|');
     end if;
 
     -- process star
@@ -623,7 +671,7 @@ begin
     l_return := replace(l_return, '$', '\$');
 
     -- process multiple like pattern
-    if l_has_commas then
+    if l_has_space then
         l_return := '(' || l_return || ')';
     end if;
 

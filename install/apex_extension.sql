@@ -8,11 +8,15 @@ set trimout on
 set trimspool on
 whenever sqlerror exit sql.sqlcode rollback
 
-prompt CREATE OR REFRESH NEEDED MVIEW
+exec dbms_output.put_line( 'ORACLE DATA MODEL UTILITIES - CREATE APEX EXTENSION PACKAGE' );
+exec dbms_output.put_line( '- Create or refresh needed mviews:' );
+exec model.create_or_refresh_mview('ALL_TABLES'     , 'SYS');
 exec model.create_or_refresh_mview('ALL_TAB_COLUMNS', 'SYS');
-prompt
-prompt ORACLE DATA MODEL UTILITIES - CREATE APEX EXTENSION PACKAGE
-prompt - Project page https://github.com/ogobrecht/model
+exec model.create_or_refresh_mview('ALL_CONSTRAINTS', 'SYS');
+exec model.create_or_refresh_mview('ALL_INDEXES'    , 'SYS');
+exec model.create_or_refresh_mview('ALL_OBJECTS'    , 'SYS');
+exec model.create_or_refresh_mview('ALL_VIEWS'      , 'SYS');
+exec model.create_or_refresh_mview('ALL_TRIGGERS'   , 'SYS');
 -- select * from all_plsql_object_settings where name = 'MODEL';
 
 prompt - Set compiler flags
@@ -41,7 +45,7 @@ begin
 end;
 /
 
-prompt - Package model_joel (spec)
+exec dbms_output.put_line( '- Package model_joel (spec)' );
 create or replace package model_joel authid current_user is
 
 /**
@@ -49,8 +53,8 @@ create or replace package model_joel authid current_user is
 Oracle Data Model Utilities - APEX Extension
 ============================================
 
-Helpers to support a generic Interactive Report to show the data of any
-table.
+Oracle APEX helpers to support a generic Interactive Report to show the data
+of any table.
 
 **/
 
@@ -108,7 +112,8 @@ procedure set_session_state (
     p_max_cols_varchar       in integer  default   20 ,
     p_max_cols_clob          in integer  default    5 ,
     p_item_column_names      in varchar2 default null ,
-    p_item_messages          in varchar2 default null );
+    p_item_messages          in varchar2 default null ,
+    p_item_type              in varchar2 default null );
 /**
 
 set the session state of application items for a given table. The state is then
@@ -242,10 +247,61 @@ end;
 
 --------------------------------------------------------------------------------
 
+function get_overview_counts (
+    p_owner           in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
+    p_objects_include in varchar2 default null ,
+    p_objects_exclude in varchar2 default null ,
+    p_columns_include in varchar2 default null )
+    return varchar2;
+/**
+
+Get the number of tables, views and columns for a schema. Returns JSON as
+varchar2.
+
+Include and exclude filters are case insensitive contains filters - multiple
+search terms can be given separated by spaces.
+
+EXAMPLE
+
+```sql
+select model_joel.get_overview_counts (
+           p_owner           => 'MDSYS',
+           p_objects_include => 'coord meta' )
+       as overview_counts
+  from dual;
+
+--> {"TABLES":12,"TABLE_COLUMNS":156,"VIEWS":16,"VIEW_COLUMNS":288}
+
+**/
+
+function get_detail_counts (
+    p_owner       in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
+    p_object_name in varchar2 default null )
+    return varchar2;
+/**
+
+Get the number of rows, columns, constrints, indexes, and triggers for a
+table or view. Returns JSON as varchar2.
+
+EXAMPLE
+
+```sql
+select model_joel.get_detail_counts (
+           p_owner        => 'MDSYS',
+           p_object_name => 'SDO_COORD_OP_PARAM_VALS' )
+       as overview_counts
+  from dual;
+
+--> {"ROWS":15105,"COLUMNS":8,"CONSTRAINTS":5,"INDEXES":1,"TRIGGERS":2}
+
+**/
+
+--------------------------------------------------------------------------------
+
 end model_joel;
 /
 
-prompt - Package model_joel (body)
+exec dbms_output.put_line( '- Package model_joel (body)' );
 create or replace package body model_joel is
 
 --------------------------------------------------------------------------------
@@ -272,7 +328,39 @@ type columns_row is record (
 
 type columns_tab is table of columns_row index by binary_integer;
 
+type skipped_tab is table of pls_integer index by varchar2(30);
+
+g_skipped_unsupported skipped_tab;
+g_skipped_unavailable skipped_tab;
 g_table_exists boolean;
+
+--------------------------------------------------------------------------------
+
+procedure count_skipped_unsupported (
+    p_data_type varchar2 )
+is
+    l_datatype varchar2(30) := lower(p_data_type);
+begin
+    if g_skipped_unsupported.exists(l_datatype) then
+        g_skipped_unsupported(l_datatype) := g_skipped_unsupported(l_datatype) + 1;
+    else
+        g_skipped_unsupported(l_datatype) := 1;
+    end if;
+end count_skipped_unsupported;
+
+--------------------------------------------------------------------------------
+
+procedure count_skipped_unavailable (
+    p_data_type varchar2 )
+is
+    l_datatype varchar2(30) := lower(p_data_type);
+begin
+    if g_skipped_unavailable.exists(l_datatype) then
+        g_skipped_unavailable(l_datatype) := g_skipped_unavailable(l_datatype) + 1;
+    else
+        g_skipped_unavailable(l_datatype) := 1;
+    end if;
+end count_skipped_unavailable;
 
 --------------------------------------------------------------------------------
 
@@ -321,18 +409,18 @@ function get_columns (
     p_max_cols_clob          in integer  default    5 )
     return columns_tab
 is
-    v_column_included   boolean;
-    v_columns           columns_tab;
-    v_index             pls_integer;
-    v_column_alias      varchar2( 30);
-    v_column_expression varchar2(200);
-    v_count_n           pls_integer := 0;
-    v_count_vc          pls_integer := 0;
-    v_count_clob        pls_integer := 0;
-    v_count_d           pls_integer := 0;
-    v_count_ts          pls_integer := 0;
-    v_count_tstz        pls_integer := 0;
-    v_count_tsltz       pls_integer := 0;
+    l_column_included   boolean;
+    l_columns           columns_tab;
+    l_index             pls_integer;
+    l_column_alias      varchar2( 30);
+    l_column_expression varchar2(200);
+    l_count_n           pls_integer := 0;
+    l_count_vc          pls_integer := 0;
+    l_count_clob        pls_integer := 0;
+    l_count_d           pls_integer := 0;
+    l_count_ts          pls_integer := 0;
+    l_count_tstz        pls_integer := 0;
+    l_count_tsltz       pls_integer := 0;
 
     ----------------------------------------
 
@@ -352,74 +440,74 @@ is
                 column_id )
         loop
             g_table_exists    := true;
-            v_index           := v_columns.count + 1;
+            l_index           := l_columns.count + 1;
 
-            v_columns(v_index).data_type                     := i.data_type;
-            v_columns(v_index).data_type_alias               := get_data_type_alias(i.data_type);
-            v_columns(v_index).column_name                   := i.column_name;
-            v_columns(v_index).column_header                 := initcap(replace(i.column_name, '_', ' '));
-            v_columns(v_index).is_unsupported_data_type      := false;
-            v_columns(v_index).is_unavailable_generic_column := false;
+            l_columns(l_index).data_type                     := i.data_type;
+            l_columns(l_index).data_type_alias               := get_data_type_alias(i.data_type);
+            l_columns(l_index).column_name                   := i.column_name;
+            l_columns(l_index).column_header                 := initcap(replace(i.column_name, '_', ' '));
+            l_columns(l_index).is_unsupported_data_type      := false;
+            l_columns(l_index).is_unavailable_generic_column := false;
 
-            case v_columns(v_index).data_type_alias
+            case l_columns(l_index).data_type_alias
                 when c_N then
-                    v_count_n                            := v_count_n + 1;
-                    v_columns(v_index).column_alias      := get_column_alias(v_columns(v_index).data_type_alias, v_count_n);
-                    v_columns(v_index).column_expression := i.column_name;
-                    if v_count_n > p_max_cols_number then
-                        v_columns(v_index).is_unavailable_generic_column := true;
+                    l_count_n                            := l_count_n + 1;
+                    l_columns(l_index).column_alias      := get_column_alias(l_columns(l_index).data_type_alias, l_count_n);
+                    l_columns(l_index).column_expression := '"' || i.column_name || '"';
+                    if l_count_n > p_max_cols_number then
+                        l_columns(l_index).is_unavailable_generic_column := true;
                     end if;
 
                 when c_D then
-                    v_count_d                            := v_count_d + 1;
-                    v_columns(v_index).column_alias      := get_column_alias(v_columns(v_index).data_type_alias, v_count_d);
-                    v_columns(v_index).column_expression := i.column_name;
-                    if v_count_d > p_max_cols_date then
-                        v_columns(v_index).is_unavailable_generic_column := true;
+                    l_count_d                            := l_count_d + 1;
+                    l_columns(l_index).column_alias      := get_column_alias(l_columns(l_index).data_type_alias, l_count_d);
+                    l_columns(l_index).column_expression := '"' || i.column_name || '"';
+                    if l_count_d > p_max_cols_date then
+                        l_columns(l_index).is_unavailable_generic_column := true;
                     end if;
 
                 when c_TSLTZ then
-                    v_count_tsltz                        := v_count_tsltz + 1;
-                    v_columns(v_index).column_alias      := get_column_alias(v_columns(v_index).data_type_alias, v_count_tsltz);
-                    v_columns(v_index).column_expression := i.column_name;
-                    if v_count_tsltz > p_max_cols_timestamp_ltz then
-                        v_columns(v_index).is_unavailable_generic_column := true;
+                    l_count_tsltz                        := l_count_tsltz + 1;
+                    l_columns(l_index).column_alias      := get_column_alias(l_columns(l_index).data_type_alias, l_count_tsltz);
+                    l_columns(l_index).column_expression := '"' || i.column_name || '"';
+                    if l_count_tsltz > p_max_cols_timestamp_ltz then
+                        l_columns(l_index).is_unavailable_generic_column := true;
                     end if;
 
                 when c_TSTZ then
-                    v_count_tstz                         := v_count_tstz + 1;
-                    v_columns(v_index).column_alias      := get_column_alias(v_columns(v_index).data_type_alias, v_count_tstz);
-                    v_columns(v_index).column_expression := i.column_name;
-                    if v_count_tstz > p_max_cols_timestamp_tz then
-                        v_columns(v_index).is_unavailable_generic_column := true;
+                    l_count_tstz                         := l_count_tstz + 1;
+                    l_columns(l_index).column_alias      := get_column_alias(l_columns(l_index).data_type_alias, l_count_tstz);
+                    l_columns(l_index).column_expression := '"' || i.column_name || '"';
+                    if l_count_tstz > p_max_cols_timestamp_tz then
+                        l_columns(l_index).is_unavailable_generic_column := true;
                     end if;
 
                 when c_TS then
-                    v_count_ts                           := v_count_ts + 1;
-                    v_columns(v_index).column_alias      := get_column_alias(v_columns(v_index).data_type_alias, v_count_ts);
-                    v_columns(v_index).column_expression := i.column_name;
-                    if v_count_ts > p_max_cols_timestamp then
-                        v_columns(v_index).is_unavailable_generic_column := true;
+                    l_count_ts                           := l_count_ts + 1;
+                    l_columns(l_index).column_alias      := get_column_alias(l_columns(l_index).data_type_alias, l_count_ts);
+                    l_columns(l_index).column_expression := '"' || i.column_name || '"';
+                    if l_count_ts > p_max_cols_timestamp then
+                        l_columns(l_index).is_unavailable_generic_column := true;
                     end if;
 
                 when c_VC then
-                    v_count_vc                           := v_count_vc + 1;
-                    v_columns(v_index).column_alias      := get_column_alias(v_columns(v_index).data_type_alias, v_count_vc);
-                    v_columns(v_index).column_expression := i.column_name;
-                    if v_count_vc > p_max_cols_varchar then
-                        v_columns(v_index).is_unavailable_generic_column := true;
+                    l_count_vc                           := l_count_vc + 1;
+                    l_columns(l_index).column_alias      := get_column_alias(l_columns(l_index).data_type_alias, l_count_vc);
+                    l_columns(l_index).column_expression := '"' || i.column_name || '"';
+                    if l_count_vc > p_max_cols_varchar then
+                        l_columns(l_index).is_unavailable_generic_column := true;
                     end if;
 
                 when c_CLOB then
-                    v_count_clob                         := v_count_clob + 1;
-                    v_columns(v_index).column_alias      := get_column_alias(v_columns(v_index).data_type_alias, v_count_clob);
-                    v_columns(v_index).column_expression := 'substr(' || i.column_name || ', 1, 4000)';
-                    if v_count_clob > p_max_cols_clob then
-                        v_columns(v_index).is_unavailable_generic_column := true;
+                    l_count_clob                         := l_count_clob + 1;
+                    l_columns(l_index).column_alias      := get_column_alias(l_columns(l_index).data_type_alias, l_count_clob);
+                    l_columns(l_index).column_expression := 'substr("' || i.column_name || '", 1, 4000)';
+                    if l_count_clob > p_max_cols_clob then
+                        l_columns(l_index).is_unavailable_generic_column := true;
                     end if;
 
                 else
-                    v_columns(v_index).is_unsupported_data_type := true;
+                    l_columns(l_index).is_unsupported_data_type := true;
             end case;
 
         end loop;
@@ -430,22 +518,22 @@ is
     procedure fill_gaps (
         p_data_type_alias in varchar2 )
     is
-        v_count      pls_integer;
-        v_max_cols   pls_integer;
-        v_expression varchar2(200);
+        l_count      pls_integer;
+        l_max_cols   pls_integer;
+        l_expression varchar2(200);
     begin
-        v_count :=
+        l_count :=
             case p_data_type_alias
-                when c_N     then v_count_n
-                when c_D     then v_count_d
-                when c_TSLTZ then v_count_tsltz
-                when c_TSTZ  then v_count_tstz
-                when c_TS    then v_count_ts
-                when c_VC    then v_count_vc
-                when c_CLOB  then v_count_clob
+                when c_N     then l_count_n
+                when c_D     then l_count_d
+                when c_TSLTZ then l_count_tsltz
+                when c_TSTZ  then l_count_tstz
+                when c_TS    then l_count_ts
+                when c_VC    then l_count_vc
+                when c_CLOB  then l_count_clob
             end + 1;
 
-        v_max_cols :=
+        l_max_cols :=
             case p_data_type_alias
                 when c_N     then p_max_cols_number
                 when c_D     then p_max_cols_date
@@ -456,7 +544,7 @@ is
                 when c_CLOB  then p_max_cols_clob
             end;
 
-        v_expression :=
+        l_expression :=
             case p_data_type_alias
                 when c_N     then 'cast(null as number)'
                 when c_D     then 'cast(null as date)'
@@ -467,14 +555,14 @@ is
                 when c_CLOB  then 'to_clob(null)'
             end;
 
-        for i in v_count .. v_max_cols
+        for i in l_count .. l_max_cols
         loop
-            v_index := v_columns.count + 1;
+            l_index := l_columns.count + 1;
 
-            v_columns(v_index).column_alias                  := get_column_alias(p_data_type_alias, i);
-            v_columns(v_index).column_expression             := v_expression;
-            v_columns(v_index).is_unsupported_data_type      := false;
-            v_columns(v_index).is_unavailable_generic_column := false;
+            l_columns(l_index).column_alias                  := get_column_alias(p_data_type_alias, i);
+            l_columns(l_index).column_expression             := l_expression;
+            l_columns(l_index).is_unsupported_data_type      := false;
+            l_columns(l_index).is_unavailable_generic_column := false;
         end loop;
     end fill_gaps;
 
@@ -493,7 +581,7 @@ begin
     fill_gaps ( c_VC    );
     fill_gaps ( c_CLOB  );
 
-    return v_columns;
+    return l_columns;
 
 end get_columns;
 
@@ -511,13 +599,14 @@ function get_table_query (
     p_max_cols_clob          in integer  default    5 )
     return clob
 is
-    v_return        clob;
-    v_columns       columns_tab;
-    v_sep           varchar2(2) := ',' || chr(10);
-    v_column_indent varchar2(7) := '       ';
+    l_return        clob;
+    l_columns       columns_tab;
+    l_sep           varchar2(2) := ',' || chr(10);
+    l_column_indent varchar2(7) := '       ';
 begin
-    v_columns := get_columns (
+    l_columns := get_columns (
         p_table_name             => p_table_name             ,
+        p_owner                  => p_owner                  ,
         p_max_cols_number        => p_max_cols_number        ,
         p_max_cols_date          => p_max_cols_date          ,
         p_max_cols_timestamp_ltz => p_max_cols_timestamp_ltz ,
@@ -526,24 +615,24 @@ begin
         p_max_cols_varchar       => p_max_cols_varchar       ,
         p_max_cols_clob          => p_max_cols_clob          );
 
-    for i in 1 .. v_columns.count loop
-        if v_columns(i).column_alias is not null then
-            v_return := v_return
-                || v_column_indent
-                || v_columns(i).column_expression
+    for i in 1 .. l_columns.count loop
+        if l_columns(i).column_alias is not null then
+            l_return := l_return
+                || l_column_indent
+                || l_columns(i).column_expression
                 || ' as '
-                || v_columns(i).column_alias
-                || v_sep;
+                || l_columns(i).column_alias
+                || l_sep;
         end if;
     end loop;
 
-    v_return := 'select ' || rtrim( ltrim(v_return), v_sep ) || chr(10) ||
+    l_return := 'select ' || rtrim( ltrim(l_return), l_sep ) || chr(10) ||
                 '  from ' || case when g_table_exists
-                                  then p_table_name
+                                  then p_owner || '.' || p_table_name
                                   else 'dual'|| chr(10) || ' where 1 = 2'
                              end;
 
-    return v_return;
+    return l_return;
 end get_table_query;
 
 --------------------------------------------------------------------------------
@@ -559,14 +648,17 @@ procedure set_session_state (
     p_max_cols_varchar       in integer  default   20 ,
     p_max_cols_clob          in integer  default    5 ,
     p_item_column_names      in varchar2 default null ,
-    p_item_messages          in varchar2 default null )
+    p_item_messages          in varchar2 default null ,
+    p_item_type              in varchar2 default null )
 is
-    v_columns_tab                columns_tab;
-    v_columns_csv                varchar2(32767);
-    v_unsupported_data_types     varchar2(32767);
-    v_unavailable_generic_column varchar2(32767);
+    l_columns_tab                columns_tab;
+    l_columns_csv                varchar2(32767);
+    l_unsupported_data_types     varchar2(32767);
+    l_unavailable_generic_column varchar2(32767);
+    l_type                       varchar2(128);
+    l_index                      varchar2(30);
 begin
-    v_columns_tab := get_columns (
+    l_columns_tab := get_columns (
         p_table_name             => p_table_name             ,
         p_owner                  => p_owner                  ,
         p_max_cols_number        => p_max_cols_number        ,
@@ -577,50 +669,74 @@ begin
         p_max_cols_varchar       => p_max_cols_varchar       ,
         p_max_cols_clob          => p_max_cols_clob          );
 
-    for i in 1 .. v_columns_tab.count loop
-        if      not v_columns_tab(i).is_unsupported_data_type
-            and not v_columns_tab(i).is_unavailable_generic_column
+    for i in 1 .. l_columns_tab.count loop
+        if      not l_columns_tab(i).is_unsupported_data_type
+            and not l_columns_tab(i).is_unavailable_generic_column
         then
             apex_util.set_session_state (
-                p_name  => v_columns_tab(i).column_alias,
-                p_value => v_columns_tab(i).column_header);
-            v_columns_csv := v_columns_csv || v_columns_tab(i).column_alias || ',';
-        end if;
-
-        if v_columns_tab(i).is_unsupported_data_type then
-            v_unsupported_data_types := v_unsupported_data_types ||
-                v_columns_tab(i).column_header ||
-                ' (' || lower(v_columns_tab(i).data_type) || '), ';
-        end if;
-
-        if v_columns_tab(i).is_unavailable_generic_column then
-            v_unavailable_generic_column := v_unavailable_generic_column ||
-                v_columns_tab(i).column_header ||
-                ' (' || lower(v_columns_tab(i).data_type) || '), ';
+                p_name  => l_columns_tab(i).column_alias,
+                p_value => l_columns_tab(i).column_header);
+            l_columns_csv := l_columns_csv || l_columns_tab(i).column_alias || ',';
+        else
+            if l_columns_tab(i).is_unsupported_data_type then
+                count_skipped_unsupported(l_columns_tab(i).data_type);
+            end if;
+            if l_columns_tab(i).is_unavailable_generic_column then
+                count_skipped_unavailable(l_columns_tab(i).data_type);
+            end if;
         end if;
     end loop;
 
     if p_item_column_names is not null then
         apex_util.set_session_state (
             p_name  => p_item_column_names,
-            p_value => rtrim(v_columns_csv, ',') );
+            p_value => rtrim(l_columns_csv, ',') );
     end if;
 
     if p_item_messages is not null then
-        if v_unsupported_data_types is not null then
-            v_unsupported_data_types := 'Skipped columns because of unsupported data types: ' ||
-                                        rtrim(v_unsupported_data_types, ', ') || '. ';
+        if g_skipped_unsupported.count > 0 then
+            l_unsupported_data_types := 'Skipped because of unsupported data types: ';
+            l_index := g_skipped_unsupported.first;
+            while l_index is not null loop
+                l_unsupported_data_types := l_unsupported_data_types ||
+                    to_char(g_skipped_unsupported(l_index)) ||
+                    ' column' || case when g_skipped_unsupported(l_index) > 1 then 's' end ||
+                    ' of data type ' || l_index || ', ';
+                l_index := g_skipped_unsupported.next(l_index);
+            end loop;
+            l_unsupported_data_types := rtrim(l_unsupported_data_types, ', ') || '.';
         end if;
 
-        if v_unavailable_generic_column is not null then
-            v_unavailable_generic_column := 'Skipped columns because of unavailable generic columns: ' ||
-                                        rtrim(v_unavailable_generic_column, ', ') || '.';
+        if g_skipped_unavailable.count > 0 then
+            l_unavailable_generic_column := 'Skipped because of unavailable generic columns: ';
+            l_index := g_skipped_unavailable.first;
+            while l_index is not null loop
+                l_unavailable_generic_column := l_unavailable_generic_column ||
+                    to_char(g_skipped_unavailable(l_index)) ||
+                    ' column' || case when g_skipped_unavailable(l_index) > 1 then 's' end ||
+                    ' of data type ' || l_index || ', ';
+                l_index := g_skipped_unavailable.next(l_index);
+            end loop;
+            l_unavailable_generic_column := rtrim(l_unavailable_generic_column, ', ') || '.';
         end if;
 
         apex_util.set_session_state (
             p_name  => p_item_messages,
-            p_value => substr(v_unsupported_data_types || v_unavailable_generic_column, 1, 32767 ) );
+            p_value => substr(l_unsupported_data_types || ' ' || l_unavailable_generic_column, 1, 32767 ) );
     end if;
+
+    if p_item_type is not null then
+        select nvl(min(object_type), 'UNKNOWN')
+          into l_type
+          from all_objects_mv
+         where owner       = p_owner
+           and object_name = p_table_name;
+
+        apex_util.set_session_state (
+            p_name  => p_item_type,
+            p_value => l_type );
+    end if;
+
 end set_session_state;
 
 --------------------------------------------------------------------------------
@@ -635,24 +751,24 @@ procedure create_application_items (
     p_max_cols_varchar       in integer default 20 ,
     p_max_cols_clob          in integer default  5 )
 is
-    v_app_items wwv_flow_global.vc_map;
+    l_app_items wwv_flow_global.vc_map;
 
     ----------------------------------------
 
     procedure create_items (
         p_data_type_alias in varchar2 )
     is
-        v_column_alias   varchar2(30);
-        v_max_cols       pls_integer;
-        v_count_n        pls_integer := 0;
-        v_count_vc       pls_integer := 0;
-        v_count_clob     pls_integer := 0;
-        v_count_d        pls_integer := 0;
-        v_count_ts       pls_integer := 0;
-        v_count_tstz     pls_integer := 0;
-        v_count_tsltz    pls_integer := 0;
+        l_column_alias   varchar2(30);
+        l_max_cols       pls_integer;
+        l_count_n        pls_integer := 0;
+        l_count_vc       pls_integer := 0;
+        l_count_clob     pls_integer := 0;
+        l_count_d        pls_integer := 0;
+        l_count_ts       pls_integer := 0;
+        l_count_tstz     pls_integer := 0;
+        l_count_tsltz    pls_integer := 0;
     begin
-        v_max_cols :=
+        l_max_cols :=
             case p_data_type_alias
                 when c_N     then p_max_cols_number
                 when c_D     then p_max_cols_date
@@ -663,15 +779,15 @@ is
                 when c_CLOB  then p_max_cols_clob
             end;
 
-        for i in 1 .. v_max_cols
+        for i in 1 .. l_max_cols
         loop
-            v_column_alias := get_column_alias(p_data_type_alias, i);
+            l_column_alias := get_column_alias(p_data_type_alias, i);
 
-            if not v_app_items.exists(v_column_alias) then
+            if not l_app_items.exists(l_column_alias) then
                 wwv_flow_imp_shared.create_flow_item (
                     p_flow_id          => p_app_id,
                     p_id               => wwv_flow_id.next_val,
-                    p_name             => v_column_alias,
+                    p_name             => l_column_alias,
                     p_protection_level => 'I' );
             end if;
         end loop;
@@ -689,7 +805,7 @@ begin
         where
             application_id = p_app_id )
     loop
-        v_app_items ( i.item_name ) := null; -- we need only the key
+        l_app_items ( i.item_name ) := null; -- we need only the key
     end loop;
 
     -- create app items as needed
@@ -717,8 +833,8 @@ procedure create_interactive_report (
     p_max_cols_varchar       in integer  default 20 ,
     p_max_cols_clob          in integer  default  5 )
 is
-    v_display_order number := 10;
-    v_count         number;
+    l_display_order number := 10;
+    l_count         number;
 
     ----------------------------------------
 
@@ -728,12 +844,12 @@ is
         p_theme in number default 42)
         return number
     is
-        v_return number;
+        l_return number;
     begin
         select
             template_id
         into
-            v_return
+            l_return
         from
             apex_application_templates
         where
@@ -741,7 +857,7 @@ is
             and theme_number  = p_theme
             and template_type = p_type
             and template_name = p_name;
-    return v_return;
+    return l_return;
     exception
         when no_data_found then
             return null;
@@ -754,7 +870,7 @@ is
         select
             count(*)
         into
-            v_count
+            l_count
         from
             apex_application_page_regions
         where
@@ -762,12 +878,12 @@ is
             and page_id     = p_page_id
             and region_name = p_region_name;
 
-        return case when v_count > 0 then true else false end;
+        return case when l_count > 0 then true else false end;
     end report_exists;
 
     procedure create_report
     is
-        v_temp_id number;
+        l_temp_id number;
     begin
         wwv_flow_imp_page.create_page_plug (
             p_flow_id                     => p_app_id,
@@ -815,12 +931,12 @@ is
             p_prn_page_footer_alignment   => 'CENTER',
             p_prn_border_color            => '#666666' );
 
-        v_temp_id := wwv_flow_id.next_val;
+        l_temp_id := wwv_flow_id.next_val;
 
         wwv_flow_imp_page.create_worksheet (
             p_flow_id                => p_app_id,
             p_page_id                => p_page_id,
-            p_id                     => v_temp_id,
+            p_id                     => l_temp_id,
             p_max_row_count          => '1000000',
             p_no_data_found_message  => 'No data found.',
             p_max_rows_per_page      => '1000',
@@ -835,7 +951,7 @@ is
             p_enable_mail_download   => 'Y',
             p_detail_link_text       => '<img src="#IMAGE_PREFIX#app_ui/img/icons/apex-edit-view.png" class="apex-edit-view" alt="">',
             p_owner                  => apex_application.g_user,
-            p_internal_uid           => v_temp_id );
+            p_internal_uid           => l_temp_id );
     end create_report;
 
     ----------------------------------------
@@ -843,21 +959,21 @@ is
     procedure create_report_columns (
         p_data_type_alias in varchar2 )
     is
-        v_column_alias     varchar2(30);
-        v_column_type      varchar2(30);
-        v_column_alignment varchar2(30);
-        v_format_mask      varchar2(30);
-        v_tz_dependent     varchar2( 1);
-        v_max_cols         pls_integer;
-        v_count_n          pls_integer := 0;
-        v_count_d          pls_integer := 0;
-        v_count_ts         pls_integer := 0;
-        v_count_tstz       pls_integer := 0;
-        v_count_tsltz      pls_integer := 0;
-        v_count_vc         pls_integer := 0;
-        v_count_clob       pls_integer := 0;
+        l_column_alias     varchar2(30);
+        l_column_type      varchar2(30);
+        l_column_alignment varchar2(30);
+        l_format_mask      varchar2(30);
+        l_tz_dependent     varchar2( 1);
+        l_max_cols         pls_integer;
+        l_count_n          pls_integer := 0;
+        l_count_d          pls_integer := 0;
+        l_count_ts         pls_integer := 0;
+        l_count_tstz       pls_integer := 0;
+        l_count_tsltz      pls_integer := 0;
+        l_count_vc         pls_integer := 0;
+        l_count_clob       pls_integer := 0;
     begin
-        v_max_cols :=
+        l_max_cols :=
             case p_data_type_alias
                 when c_N     then p_max_cols_number
                 when c_D     then p_max_cols_date
@@ -868,7 +984,7 @@ is
                 when c_CLOB  then p_max_cols_clob
             end;
 
-        v_column_type :=
+        l_column_type :=
             case p_data_type_alias
                 when c_N     then 'NUMBER'
                 when c_D     then 'DATE'
@@ -879,7 +995,7 @@ is
                 when c_CLOB  then 'CLOB'
             end;
 
-        v_column_alignment :=
+        l_column_alignment :=
             case p_data_type_alias
                 when c_N     then 'RIGHT'
                 when c_D     then 'CENTER'
@@ -890,7 +1006,7 @@ is
                 when c_CLOB  then 'LEFT'
             end;
 
-        v_format_mask :=
+        l_format_mask :=
             case p_data_type_alias
                 when c_D     then 'YYYY-MM-DD HH24:MI:SS'
                 when c_TSLTZ then 'YYYY-MM-DD HH24:MI:SSXFF TZR'
@@ -899,40 +1015,40 @@ is
                 else              null
             end;
 
-        v_tz_dependent :=
+        l_tz_dependent :=
             case p_data_type_alias
                 when c_TSLTZ then 'Y'
                 else              'N'
             end;
 
-        for i in 1 .. v_max_cols
+        for i in 1 .. l_max_cols
         loop
-            v_column_alias := get_column_alias(p_data_type_alias, i);
+            l_column_alias := get_column_alias(p_data_type_alias, i);
 
             wwv_flow_imp_page.create_worksheet_column (
                 p_id                     => wwv_flow_id.next_val,
-                p_db_column_name         => v_column_alias,
-                p_display_order          => v_display_order,
-                p_column_identifier      => v_column_alias,
-                p_column_label           => '&'||v_column_alias||'.',
-                p_column_type            => v_column_type,
-                p_column_alignment       => v_column_alignment,
-                p_format_mask            => v_format_mask,
-                p_tz_dependent           => v_tz_dependent,
+                p_db_column_name         => l_column_alias,
+                p_display_order          => l_display_order,
+                p_column_identifier      => l_column_alias,
+                p_column_label           => '&'||l_column_alias||'.',
+                p_column_type            => l_column_type,
+                p_column_alignment       => l_column_alignment,
+                p_format_mask            => l_format_mask,
+                p_tz_dependent           => l_tz_dependent,
                 p_display_condition_type => 'ITEM_IS_NOT_NULL',
-                p_display_condition      => v_column_alias,
+                p_display_condition      => l_column_alias,
                 p_use_as_row_header      => 'N',
                 --disable some things for CLOBs
-                p_allow_sorting          => case when v_column_type = c_CLOB then 'N' else 'Y' end,
-                p_allow_ctrl_breaks      => case when v_column_type = c_CLOB then 'N' else 'Y' end,
-                p_allow_aggregations     => case when v_column_type = c_CLOB then 'N' else 'Y' end,
-                p_allow_computations     => case when v_column_type = c_CLOB then 'N' else 'Y' end,
-                p_allow_charting         => case when v_column_type = c_CLOB then 'N' else 'Y' end,
-                p_allow_group_by         => case when v_column_type = c_CLOB then 'N' else 'Y' end,
-                p_allow_pivot            => case when v_column_type = c_CLOB then 'N' else 'Y' end,
-                p_rpt_show_filter_lov    => case when v_column_type = c_CLOB then 'N' else 'D' end );
+                p_allow_sorting          => case when l_column_type = c_CLOB then 'N' else 'Y' end,
+                p_allow_ctrl_breaks      => case when l_column_type = c_CLOB then 'N' else 'Y' end,
+                p_allow_aggregations     => case when l_column_type = c_CLOB then 'N' else 'Y' end,
+                p_allow_computations     => case when l_column_type = c_CLOB then 'N' else 'Y' end,
+                p_allow_charting         => case when l_column_type = c_CLOB then 'N' else 'Y' end,
+                p_allow_group_by         => case when l_column_type = c_CLOB then 'N' else 'Y' end,
+                p_allow_pivot            => case when l_column_type = c_CLOB then 'N' else 'Y' end,
+                p_rpt_show_filter_lov    => case when l_column_type = c_CLOB then 'N' else 'D' end );
 
-            v_display_order := v_display_order + 10;
+            l_display_order := l_display_order + 10;
         end loop;
     end create_report_columns;
 
@@ -952,6 +1068,235 @@ begin
     end if;
 
 end create_interactive_report;
+
+--------------------------------------------------------------------------------
+
+function get_overview_counts (
+    p_owner           in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
+    p_objects_include in varchar2 default null ,
+    p_objects_exclude in varchar2 default null ,
+    p_columns_include in varchar2 default null )
+    return varchar2
+is
+    l_return varchar2(4000);
+begin
+    select json_object (
+           'TABLES' value
+             ( select count(*)
+                 from all_tables_mv t
+                where owner = p_owner
+                  and regexp_like (
+                          table_name,
+                          (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                          'i' )
+                  and not regexp_like (
+                          table_name,
+                          (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                          'i' )
+                  and table_name in (
+                          select distinct table_name
+                            from all_tab_columns_mv
+                           where owner = p_owner
+                             and regexp_like (
+                                     column_name,
+                                     (select nvl(model.to_regexp_like(p_columns_include), '.*') from dual),
+                                     'i') ) ),
+           'TABLE_COLUMNS' value
+              ( select count(*)
+                  from all_tab_columns_mv
+                 where owner = p_owner
+                   and table_name in ( select table_name from all_tables_mv
+                                        where owner = p_owner )
+                   and regexp_like (
+                           table_name,
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           'i' )
+                   and not regexp_like (
+                           table_name,
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           'i' )
+                   and regexp_like (
+                           column_name,
+                           (select nvl(model.to_regexp_like(p_columns_include), '.*') from dual),
+                           'i') ),
+           'INDEXES' value
+              ( select count(*)
+                  from all_indexes_mv
+                 where owner = p_owner
+                   and regexp_like (
+                           table_name,
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           'i' )
+                   and not regexp_like (
+                           table_name,
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           'i' )
+                   and index_name in (
+                           select index_name
+                             from all_ind_columns_mv
+                            where regexp_like (
+                                      column_name,
+                                      (select nvl(model.to_regexp_like(p_columns_include), '.*') from dual),
+                                      'i') ) ),
+           'VIEWS' value
+              ( select count(*)
+                  from all_views_mv t
+                 where owner = p_owner
+                   and regexp_like (
+                           view_name,
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           'i' )
+                   and not regexp_like (
+                           view_name,
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           'i' )
+                   and view_name in (
+                           select distinct table_name
+                             from all_tab_columns_mv
+                            where owner = p_owner
+                              and regexp_like (
+                                      column_name,
+                                      (select nvl(model.to_regexp_like(p_columns_include), '.*') from dual),
+                                      'i') ) ),
+           'VIEW_COLUMNS' value
+              ( select count(*)
+                  from all_tab_columns_mv
+                 where owner = p_owner
+                   and table_name in ( select view_name from all_views_mv
+                                        where owner = p_owner )
+                   and regexp_like (
+                           table_name,
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           'i' )
+                   and not regexp_like (
+                           table_name,
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           'i' )
+                   and regexp_like (
+                           column_name,
+                           (select nvl(model.to_regexp_like(p_columns_include), '.*') from dual),
+                           'i') ),
+           'M_VIEWS' value
+              ( select count(*)
+                  from all_mviews t
+                 where owner = p_owner
+                   and regexp_like (
+                           mview_name,
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           'i' )
+                   and not regexp_like (
+                           mview_name,
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           'i' ) ),
+           'OTHER_OBJECTS' value
+              ( select count(*)
+                  from all_objects_mv
+                 where owner = p_owner
+                   and object_type not in ('TABLE', 'INDEX', 'VIEW', 'MATERIALIZED VIEW')
+                   and regexp_like (
+                           object_name,
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           'i' )
+                   and not regexp_like (
+                           object_name,
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           'i' ) )
+      )
+      into l_return
+      from dual;
+
+    return l_return;
+end;
+
+--------------------------------------------------------------------------------
+
+function get_detail_counts (
+    p_owner       in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
+    p_object_name in varchar2 default null )
+    return varchar2
+is
+    l_count  pls_integer;
+    l_type   varchar2(128);
+    l_return varchar2(4000);
+begin
+    select count(*)
+      into l_count
+      from all_objects_mv
+     where owner       = p_owner
+       and object_name = p_object_name;
+
+    if l_count > 0 then
+        select min(object_type)
+          into l_type
+          from all_objects_mv
+         where owner       = p_owner
+           and object_name = p_object_name;
+        select json_object (
+               'ROWS' value
+                    case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
+                        nvl ( model.get_number_of_rows ( p_owner      => p_owner,
+                                                         p_table_name => p_object_name ), 0 )
+                        else 0
+                    end,
+               'COLUMNS' value
+                    case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
+                        ( select count(*)
+                            from all_tab_columns_mv
+                           where owner      = p_owner
+                             and table_name = p_object_name )
+                        else 0
+                    end,
+               'CONSTRAINTS' value
+                    case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
+                        ( select count(*)
+                            from all_constraints_mv
+                           where owner      = p_owner
+                             and table_name = p_object_name )
+                        else 0
+                    end,
+               'INDEXES_' value
+                    case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
+                        ( select count(*)
+                            from all_indexes_mv
+                           where owner      = p_owner
+                             and table_name = p_object_name )
+                        else 0
+                    end,
+               'TRIGGERS' value
+                    case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
+                        ( select count(*)
+                            from all_triggers_mv
+                           where owner      = p_owner
+                             and table_name = p_object_name )
+                        else 0
+                    end,
+               'DEPENDS_ON' value
+                    ( select count(*)
+                        from all_dependencies_mv
+                       where owner = p_owner
+                         and name  = p_object_name ),
+               'REFERENCED_BY' value
+                    ( select count(*)
+                        from all_dependencies_mv
+                       where referenced_owner = p_owner
+                         and referenced_name  = p_object_name ) )
+          into l_return
+          from dual;
+    else
+        select json_object (
+               'ROWS'          value 0,
+               'COLUMNS'       value 0,
+               'CONSTRAINTS'   value 0,
+               'INDEXES_'       value 0,
+               'TRIGGERS'      value 0,
+               'DEPENDS_ON'    value 0,
+               'REFERENCED_BY' value 0 )
+          into l_return
+          from dual;
+    end if;
+
+    return l_return;
+end;
 
 --------------------------------------------------------------------------------
 
@@ -984,9 +1329,4 @@ select name || case when type like '%BODY' then ' body' end as "Name",
  where name = 'MODEL_JOEL'
  order by name, line, position;
 
-prompt - FINISHED
-
---exec apex_session.create_session(103, 1, 'OGOBRECH');
---exec model_joel.create_application_items(103);
---exec model_joel.create_interactive_report(103,1,'Test Report 8');
-
+exec dbms_output.put_line( '- FINISHED' );

@@ -5,8 +5,8 @@ create or replace package model_joel authid current_user is
 Oracle Data Model Utilities - APEX Extension
 ============================================
 
-Helpers to support a generic Interactive Report to show the data of any
-table.
+Oracle APEX helpers to support a generic Interactive Report to show the data
+of any table.
 
 **/
 
@@ -64,7 +64,8 @@ procedure set_session_state (
     p_max_cols_varchar       in integer  default   20 ,
     p_max_cols_clob          in integer  default    5 ,
     p_item_column_names      in varchar2 default null ,
-    p_item_messages          in varchar2 default null );
+    p_item_messages          in varchar2 default null ,
+    p_item_type              in varchar2 default null );
 /**
 
 set the session state of application items for a given table. The state is then
@@ -193,6 +194,57 @@ begin
 end;
 {{/}}
 ```
+
+**/
+
+--------------------------------------------------------------------------------
+
+function get_overview_counts (
+    p_owner           in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
+    p_objects_include in varchar2 default null ,
+    p_objects_exclude in varchar2 default null ,
+    p_columns_include in varchar2 default null )
+    return varchar2;
+/**
+
+Get the number of tables, views and columns for a schema. Returns JSON as
+varchar2.
+
+Include and exclude filters are case insensitive contains filters - multiple
+search terms can be given separated by spaces.
+
+EXAMPLE
+
+```sql
+select model_joel.get_overview_counts (
+           p_owner           => 'MDSYS',
+           p_objects_include => 'coord meta' )
+       as overview_counts
+  from dual;
+
+--> {"TABLES":12,"TABLE_COLUMNS":156,"VIEWS":16,"VIEW_COLUMNS":288}
+
+**/
+
+function get_detail_counts (
+    p_owner       in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
+    p_object_name in varchar2 default null )
+    return varchar2;
+/**
+
+Get the number of rows, columns, constrints, indexes, and triggers for a
+table or view. Returns JSON as varchar2.
+
+EXAMPLE
+
+```sql
+select model_joel.get_detail_counts (
+           p_owner        => 'MDSYS',
+           p_object_name => 'SDO_COORD_OP_PARAM_VALS' )
+       as overview_counts
+  from dual;
+
+--> {"ROWS":15105,"COLUMNS":8,"CONSTRAINTS":5,"INDEXES":1,"TRIGGERS":2}
 
 **/
 
