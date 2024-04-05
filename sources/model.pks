@@ -1,7 +1,7 @@
 create or replace package model authid current_user is
 
 c_name    constant varchar2 (30 byte) := 'Oracle Data Model Utilities';
-c_version constant varchar2 (10 byte) := '0.7.3';
+c_version constant varchar2 (10 byte) := '0.8.0';
 c_url     constant varchar2 (34 byte) := 'https://github.com/ogobrecht/model';
 c_license constant varchar2 ( 3 byte) := 'MIT';
 c_author  constant varchar2 (15 byte) := 'Ottmar Gobrecht';
@@ -14,7 +14,27 @@ Oracle Data Model Utilities
 PL/SQL utilities to support data model activities like query/mview
 generation, reporting, visualizations...
 
+Project page https://github.com/ogobrecht/model
+
 **/
+
+type t_vc2_tab is table of varchar2(128);
+g_base_mviews t_vc2_tab := t_vc2_tab (
+    'ALL_TABLES',
+    'ALL_TAB_COLUMNS',
+    'ALL_CONSTRAINTS',
+    'ALL_CONS_COLUMNS',
+    'ALL_INDEXES',
+    'ALL_IND_COLUMNS',
+    'ALL_OBJECTS',
+    'ALL_DEPENDENCIES',
+    'ALL_VIEWS',
+    'ALL_TRIGGERS',
+    'ALL_SYNONYMS',
+    'USER_TAB_PRIVS',
+    'ALL_RELATIONS' );
+
+function list_base_mviews return t_vc2_tab pipelined;
 
 --------------------------------------------------------------------------------
 
@@ -62,6 +82,82 @@ EXAMPLE
 ```sql
 exec model.drop_mview('USER_TAB_COLUMNS_MV');
 ```
+**/
+
+--------------------------------------------------------------------------------
+
+procedure create_or_refresh_base_mviews;
+
+/**
+
+A convenience procedure which creates or refreshes the base materialized
+views defined in model.g_base_mviews.
+
+EXAMPLES
+
+```sql
+set serveroutput on
+exec model.create_or_refresh_base_mviews;
+```
+
+**/
+
+--------------------------------------------------------------------------------
+
+procedure drop_base_mviews;
+
+/**
+
+A convenience procedure which drops the base materialized views defined in
+model.g_base_mviews.
+
+EXAMPLES
+
+```sql
+set serveroutput on
+exec model.drop_base_mviews;
+```
+
+**/
+
+--------------------------------------------------------------------------------
+
+function all_base_mviews_exist return boolean;
+
+/**
+
+A convenience function which checks for the base materialized views defined
+in model.g_base_mviews.
+
+Returns true, if all base views exist. Otherwise false.
+
+EXAMPLES
+
+```sql
+...
+if model.all_base_mviews_exist then
+    your code here...
+end if;
+...
+```
+
+**/
+
+--------------------------------------------------------------------------------
+
+function last_refresh_base_mviews return date;
+
+/**
+
+A convenience function which returns the minimum last refresh date of the
+base materialized views defined in model.g_base_mviews.
+
+EXAMPLES
+
+```sql
+select model.last_refresh_base_mviews from dual;
+```
+
 **/
 
 --------------------------------------------------------------------------------

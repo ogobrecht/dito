@@ -1,12 +1,12 @@
 -- check for errors in package model_joel
 declare
-  v_count pls_integer;
+  l_count pls_integer;
 begin
   select count(*)
-    into v_count
+    into l_count
     from user_errors
    where name = 'MODEL_JOEL';
-  if v_count > 0 then
+  if l_count > 0 then
     dbms_output.put_line('- Package MODEL_JOEL has errors :-(');
   end if;
 end;

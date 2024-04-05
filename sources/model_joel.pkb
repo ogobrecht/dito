@@ -325,7 +325,7 @@ begin
     l_return := 'select ' || rtrim( ltrim(l_return), l_sep ) || chr(10) ||
                 '  from ' || case when g_table_exists
                                   then p_owner || '.' || p_table_name
-                                  else 'dual'|| chr(10) || ' where 1 = 2'
+                                  else 'sys.dual'|| chr(10) || ' where 1 = 2'
                              end;
 
     return l_return;
@@ -783,11 +783,11 @@ begin
                 where owner = p_owner
                   and regexp_like (
                           table_name,
-                          (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                          (select nvl(model.to_regexp_like(p_objects_include), '.*') from sys.dual),
                           'i' )
                   and not regexp_like (
                           table_name,
-                          (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                          (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from sys.dual),
                           'i' )
                   and table_name in (
                           select distinct table_name
@@ -795,7 +795,7 @@ begin
                            where owner = p_owner
                              and regexp_like (
                                      column_name,
-                                     (select nvl(model.to_regexp_like(p_columns_include), '.*') from dual),
+                                     (select nvl(model.to_regexp_like(p_columns_include), '.*') from sys.dual),
                                      'i') ) ),
            'TABLE_COLUMNS' value
               ( select count(*)
@@ -805,15 +805,15 @@ begin
                                         where owner = p_owner )
                    and regexp_like (
                            table_name,
-                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from sys.dual),
                            'i' )
                    and not regexp_like (
                            table_name,
-                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from sys.dual),
                            'i' )
                    and regexp_like (
                            column_name,
-                           (select nvl(model.to_regexp_like(p_columns_include), '.*') from dual),
+                           (select nvl(model.to_regexp_like(p_columns_include), '.*') from sys.dual),
                            'i') ),
            'INDEXES' value
               ( select count(*)
@@ -821,18 +821,18 @@ begin
                  where owner = p_owner
                    and regexp_like (
                            table_name,
-                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from sys.dual),
                            'i' )
                    and not regexp_like (
                            table_name,
-                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from sys.dual),
                            'i' )
                    and index_name in (
                            select index_name
                              from all_ind_columns_mv
                             where regexp_like (
                                       column_name,
-                                      (select nvl(model.to_regexp_like(p_columns_include), '.*') from dual),
+                                      (select nvl(model.to_regexp_like(p_columns_include), '.*') from sys.dual),
                                       'i') ) ),
            'VIEWS' value
               ( select count(*)
@@ -840,11 +840,11 @@ begin
                  where owner = p_owner
                    and regexp_like (
                            view_name,
-                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from sys.dual),
                            'i' )
                    and not regexp_like (
                            view_name,
-                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from sys.dual),
                            'i' )
                    and view_name in (
                            select distinct table_name
@@ -852,7 +852,7 @@ begin
                             where owner = p_owner
                               and regexp_like (
                                       column_name,
-                                      (select nvl(model.to_regexp_like(p_columns_include), '.*') from dual),
+                                      (select nvl(model.to_regexp_like(p_columns_include), '.*') from sys.dual),
                                       'i') ) ),
            'VIEW_COLUMNS' value
               ( select count(*)
@@ -862,27 +862,27 @@ begin
                                         where owner = p_owner )
                    and regexp_like (
                            table_name,
-                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from sys.dual),
                            'i' )
                    and not regexp_like (
                            table_name,
-                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from sys.dual),
                            'i' )
                    and regexp_like (
                            column_name,
-                           (select nvl(model.to_regexp_like(p_columns_include), '.*') from dual),
+                           (select nvl(model.to_regexp_like(p_columns_include), '.*') from sys.dual),
                            'i') ),
            'M_VIEWS' value
               ( select count(*)
-                  from all_mviews t
+                  from sys.all_mviews t
                  where owner = p_owner
                    and regexp_like (
                            mview_name,
-                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from sys.dual),
                            'i' )
                    and not regexp_like (
                            mview_name,
-                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from sys.dual),
                            'i' ) ),
            'OTHER_OBJECTS' value
               ( select count(*)
@@ -891,108 +891,354 @@ begin
                    and object_type not in ('TABLE', 'INDEX', 'VIEW', 'MATERIALIZED VIEW')
                    and regexp_like (
                            object_name,
-                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from dual),
+                           (select nvl(model.to_regexp_like(p_objects_include), '.*') from sys.dual),
                            'i' )
                    and not regexp_like (
                            object_name,
-                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from dual),
+                           (select nvl(model.to_regexp_like(p_objects_exclude), chr(10)) from sys.dual),
                            'i' ) )
       )
       into l_return
-      from dual;
+      from sys.dual;
 
     return l_return;
-end;
+end get_overview_counts;
 
 --------------------------------------------------------------------------------
 
 function get_detail_counts (
-    p_owner       in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
-    p_object_name in varchar2 default null )
+    p_owner                in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+    p_object_name          in varchar2              ,
+    p_model_exclude_tables in varchar2 default null )
     return varchar2
 is
-    l_count  pls_integer;
     l_type   varchar2(128);
     l_return varchar2(4000);
 begin
-    select count(*)
-      into l_count
+    select min(object_type)
+      into l_type
       from all_objects_mv
      where owner       = p_owner
        and object_name = p_object_name;
 
-    if l_count > 0 then
-        select min(object_type)
-          into l_type
-          from all_objects_mv
-         where owner       = p_owner
-           and object_name = p_object_name;
-        select json_object (
-               'ROWS' value
-                    case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
-                        nvl ( model.get_number_of_rows ( p_owner      => p_owner,
-                                                         p_table_name => p_object_name ), 0 )
-                        else 0
-                    end,
-               'COLUMNS' value
-                    case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
-                        ( select count(*)
-                            from all_tab_columns_mv
-                           where owner      = p_owner
-                             and table_name = p_object_name )
-                        else 0
-                    end,
-               'CONSTRAINTS' value
-                    case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
-                        ( select count(*)
-                            from all_constraints_mv
-                           where owner      = p_owner
-                             and table_name = p_object_name )
-                        else 0
-                    end,
-               'INDEXES_' value
-                    case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
-                        ( select count(*)
-                            from all_indexes_mv
-                           where owner      = p_owner
-                             and table_name = p_object_name )
-                        else 0
-                    end,
-               'TRIGGERS' value
-                    case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
-                        ( select count(*)
-                            from all_triggers_mv
-                           where owner      = p_owner
-                             and table_name = p_object_name )
-                        else 0
-                    end,
-               'DEPENDS_ON' value
+    select json_object (
+           'COLUMNS' value
+                case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
                     ( select count(*)
-                        from all_dependencies_mv
-                       where owner = p_owner
-                         and name  = p_object_name ),
-               'REFERENCED_BY' value
+                        from all_tab_columns_mv
+                       where owner      = p_owner
+                         and table_name = p_object_name )
+                    else 0
+                end,
+           'DATA' value
+                case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
+                    nvl ( model.get_number_of_rows ( p_owner      => p_owner,
+                                                     p_table_name => p_object_name ), 0 )
+                    else 0
+                end,
+           'MODEL' value
+                ( select count(*)
+                    from ( select table_name
+                             from all_relations_mv
+                            where owner   = p_owner and   table_name = p_object_name
+                                  or
+                                  r_owner = p_owner and r_table_name = p_object_name
+                            union
+                           select r_table_name
+                             from all_relations_mv
+                            where owner   = p_owner and   table_name = p_object_name
+                                  or
+                                  r_owner = p_owner and r_table_name = p_object_name
+                            union
+                           select table_name
+                             from all_tables_mv
+                            where owner   = p_owner and   table_name = p_object_name )
+                   where not regexp_like (
+                             table_name,
+                             (select nvl(model.to_regexp_like(p_model_exclude_tables), chr(10)) from sys.dual),
+                             'i' ) ),
+           'CONSTRAINTS' value
+                case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
                     ( select count(*)
-                        from all_dependencies_mv
-                       where referenced_owner = p_owner
-                         and referenced_name  = p_object_name ) )
-          into l_return
-          from dual;
-    else
-        select json_object (
-               'ROWS'          value 0,
-               'COLUMNS'       value 0,
-               'CONSTRAINTS'   value 0,
-               'INDEXES_'       value 0,
-               'TRIGGERS'      value 0,
-               'DEPENDS_ON'    value 0,
-               'REFERENCED_BY' value 0 )
-          into l_return
-          from dual;
-    end if;
+                        from all_constraints_mv
+                       where owner      = p_owner
+                         and table_name = p_object_name )
+                    else 0
+                end,
+           'INDEXES_' value
+                case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
+                    ( select count(*)
+                        from all_indexes_mv
+                       where owner      = p_owner
+                         and table_name = p_object_name )
+                    else 0
+                end,
+           'TRIGGERS' value
+                case when l_type in ('TABLE', 'VIEW', 'MATERIALIZED VIEW') then
+                    ( select count(*)
+                        from all_triggers_mv
+                       where owner      = p_owner
+                         and table_name = p_object_name )
+                    else 0
+                end,
+           'DEPENDS_ON' value
+                ( select count(*)
+                    from all_dependencies_mv
+                   where owner = p_owner
+                     and name  = p_object_name ),
+           'REFERENCED_BY' value
+                ( select count(*)
+                    from all_dependencies_mv
+                   where referenced_owner = p_owner
+                     and referenced_name  = p_object_name ) )
+      into l_return
+      from sys.dual;
 
     return l_return;
-end;
+exception when no_data_found then
+    return json_object (
+               'COLUMNS'       value 0 ,
+               'DATA'          value 0 ,
+               'MODEL'         value 0 ,
+               'CONSTRAINTS'   value 0 ,
+               'INDEXES_'      value 0 ,
+               'TRIGGERS'      value 0 ,
+               'DEPENDS_ON'    value 0 ,
+               'REFERENCED_BY' value 0 );
+end get_detail_counts;
+
+--------------------------------------------------------------------------------
+
+function get_object_meta (
+    p_owner       in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+    p_object_name in varchar2 ,
+    p_object_type in varchar2 default null)
+    return clob
+is
+    l_object_type varchar2(128)   := p_object_type;
+    l_html        apex_t_varchar2 := apex_t_varchar2();
+    l_data        apex_t_varchar2 := apex_t_varchar2();
+    --
+    procedure html_push (p_text in varchar2) is
+    begin
+        apex_string.push(l_html, p_text);
+    end html_push;
+    --
+    procedure data_push (p_text in varchar2) is
+    begin
+        apex_string.push(l_data, p_text);
+    end data_push;
+    --
+    procedure write_section (p_name in varchar2) is
+    begin
+        html_push('<h4>' || p_name || '</h4>');
+        if l_data.count > 0 then
+            html_push('<ul>');
+            for i in 1..l_data.count loop
+                html_push('<li>' || l_data(i) || '</li>');
+            end loop;
+            l_data.delete;
+            html_push('</ul>');
+        else
+            html_push('<p>No data found.</p>');
+        end if;
+    end write_section;
+begin
+    if p_object_name is not null then
+
+        if l_object_type is null then
+            begin
+                select object_type
+                  into l_object_type
+                  from all_objects_mv
+                 where owner       = p_owner
+                   and object_name = p_object_name;
+            exception
+                when no_data_found then
+                    return '<p>Object type not found for '||p_owner||'.'||p_object_name||'!</p>';
+            end;
+        end if;
+
+        if p_object_type not in ('JOB', 'LOB', 'SYNONYM') then
+                select grantee || ': ' ||
+                       listagg(lower(privilege), ', ') within group (order by privilege)
+                  bulk collect
+                  into l_data
+                  from user_tab_privs_mv
+                 where owner      = p_owner
+                   and table_name = p_object_name
+                 group by grantee;
+                write_section('Grants');
+        end if;
+
+    end if;
+
+    return
+        case when l_html.count > 0
+            then apex_string.join_clob(l_html)
+            else to_clob('<p>Nothing to report.</p>')
+        end;
+end get_object_meta;
+
+--------------------------------------------------------------------------------
+
+function get_bg_execution_status (
+    p_execution_id in number )
+    return varchar2
+is
+    l_json varchar2(32767);
+begin
+    select json_object (
+           execution_id,
+           process_name,
+           current_process_name,
+           status,
+           status_code,
+           status_message,
+           sofar,
+           totalwork,
+           created_on,
+           last_updated_on )
+      into l_json
+      from apex_appl_page_bg_proc_status
+     where execution_id = p_execution_id;
+    return l_json;
+exception
+    when no_data_found then
+        return json_object (
+                   'execution_id'         value null,
+                   'process_name'         value null,
+                   'current_process_name' value null,
+                   'status'               value null,
+                   'status_code'          value null,
+                   'status_message'       value null,
+                   'sofar'                value null,
+                   'totalwork'            value null,
+                   'created_on'           value null,
+                   'last_updated_on'      value null );
+end get_bg_execution_status;
+
+--------------------------------------------------------------------------------
+
+function view_missing_fk_indexes (
+    p_owner varchar2 default sys_context('USERENV', 'CURRENT_USER') )
+return t_indexes_tab pipelined
+is
+begin
+    for i in (
+        with excluded_owners as (
+            select username from sys.all_users where oracle_maintained = 'Y'
+            union all select 'ORDS_METADATA' from sys.dual
+            union all select 'ORDS_PUBLIC_USER' from sys.dual ),
+        needed_indexes as (
+            select c.table_name,
+                   listagg(cc.column_name, ', ')     within group(order by cc.position) as column_list,
+                   listagg('C' || tc.column_id, '_') within group(order by cc.position) as column_ids
+              from all_constraints_mv  c
+              join all_cons_columns_mv cc on c.constraint_name = cc.constraint_name
+              join all_tab_columns_mv  tc on c.table_name = tc.table_name and cc.column_name = tc.column_name
+             where c.owner = p_owner
+               and c.owner not in (select username from excluded_owners)
+               and c.constraint_type = 'R'
+               and c.table_name not like 'BIN$%'
+             group by
+                   c.table_name,
+                   c.constraint_name ),
+        existing_indexes as (
+            select table_name,
+                   listagg(column_name, ', ') within group (order by column_position) as column_list
+              from all_ind_columns_mv
+             where index_owner = p_owner
+               and index_owner not in (select username from excluded_owners)
+               and table_name not like 'BIN$%'
+             group by
+                   table_name,
+                   index_name )
+        select n.table_name,
+               n.column_list as needed_index_columns,
+               n.table_name || '_' || n.column_ids || '_FK_IX' as index_name,
+               case when e.column_list is null then
+                   'create index ' || n.table_name || '_' || n.column_ids || '_FK_IX' ||
+                   ' on ' || n.table_name || ' (' || n.column_list || ')'
+               end as ddl
+          from needed_indexes        n
+          left join existing_indexes e on n.table_name = e.table_name
+                and instr(e.column_list, n.column_list) = 1
+         where e.column_list is null
+         order by table_name, needed_index_columns )
+    loop
+        pipe row (i);
+    end loop;
+end view_missing_fk_indexes;
+
+--------------------------------------------------------------------------------
+
+procedure create_missing_fk_indexes
+is
+    l_totalwork       pls_integer;
+    l_missing_indexes t_indexes_tab;
+begin
+    select * bulk collect into l_missing_indexes
+      from table (model_joel.view_missing_fk_indexes);
+
+    if l_missing_indexes.count = 0 then
+
+        apex_background_process.set_status(
+            p_message => 'No foreign key indexes missing, stopping now...' );
+        apex_background_process.set_progress(
+            p_totalwork => 1,
+            p_sofar     => 1 );
+
+    else
+
+        l_totalwork := l_missing_indexes.count + model.g_base_mviews.count;
+        apex_background_process.set_progress(
+            p_totalwork => l_totalwork,
+            p_sofar     => 0 );
+
+        for i in 1..l_missing_indexes.count loop
+            apex_background_process.set_status(
+                p_message => 'Creating ' || l_missing_indexes(i).index_name );
+
+            execute immediate l_missing_indexes(i).ddl;
+
+            apex_background_process.set_progress(
+                p_totalwork => l_totalwork,
+                p_sofar     => i );
+        end loop;
+
+        create_or_refresh_base_mviews (
+            p_totalwork => l_totalwork,
+            p_sofar     => l_missing_indexes.count );
+
+    end if;
+end create_missing_fk_indexes;
+
+--------------------------------------------------------------------------------
+
+procedure create_or_refresh_base_mviews (
+    p_totalwork integer default null,
+    p_sofar     integer default null )
+is
+    l_totalwork pls_integer := coalesce(p_totalwork, model.g_base_mviews.count);
+    l_sofar     pls_integer := coalesce(p_sofar    , 0);
+begin
+    apex_background_process.set_progress(
+        p_totalwork => l_totalwork,
+        p_sofar     => l_sofar );
+
+    for i in 1..model.g_base_mviews.count loop
+        apex_background_process.set_status(
+            p_message => 'Refreshing ' || model.g_base_mviews(i) || '_MV' );
+
+        model.create_or_refresh_mview( model.g_base_mviews(i), 'SYS' );
+
+        apex_background_process.set_progress(
+            p_totalwork => l_totalwork,
+            p_sofar     => l_sofar + i );
+    end loop;
+end create_or_refresh_base_mviews;
+
 
 --------------------------------------------------------------------------------
 
