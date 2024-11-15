@@ -1,4 +1,6 @@
---DO NOT CHANGE THIS FILE - IT IS GENERATED WITH THE BUILD SCRIPT build.js
+prompt ORACLE DATA MODEL UTILITIES - CORE PACKAGE
+prompt - Project page https://github.com/ogobrecht/model
+
 set define on
 set serveroutput on
 set verify off
@@ -8,41 +10,39 @@ set trimout on
 set trimspool on
 whenever sqlerror exit sql.sqlcode rollback
 
-exec dbms_output.put_line( 'ORACLE DATA MODEL UTILITIES - CREATE CORE PACKAGE' );
-exec dbms_output.put_line( '- Project page https://github.com/ogobrecht/model' );
--- select * from all_plsql_object_settings where name = 'MODEL';
-
 prompt - Set compiler flags
 declare
-  v_apex_installed     varchar2(5) := 'FALSE'; -- Do not change (is set dynamically).
-  v_utils_public       varchar2(5) := 'FALSE'; -- Make utilities public available (for testing or other usages).
-  v_native_compilation boolean     := false;   -- Set this to true on your own risk (in the Oracle cloud you will get likely an "insufficient privileges" error)
-  v_count pls_integer;
+    l_apex_installed     varchar2(5) := 'FALSE'; -- Do not change (is set dynamically).
+    l_utils_public       varchar2(5) := 'FALSE'; -- Make utilities public available (for testing or other usages).
+    l_native_compilation boolean     := false;   -- Set this to true on your own risk (in the Oracle cloud you will get likely an "insufficient privileges" error)
+    l_count pls_integer;
 begin
 
-  execute immediate 'alter session set plsql_warnings = ''enable:all,disable:5004,disable:6005,disable:6006,disable:6009,disable:6010,disable:6027,disable:7207''';
-  execute immediate 'alter session set plscope_settings = ''identifiers:all''';
-  execute immediate 'alter session set plsql_optimize_level = 3';
+    execute immediate 'alter session set plsql_warnings = ''enable:all,disable:5004,disable:6005,disable:6006,disable:6009,disable:6010,disable:6027,disable:7207''';
+    execute immediate 'alter session set plscope_settings = ''identifiers:all''';
+    execute immediate 'alter session set plsql_optimize_level = 3';
 
-  if v_native_compilation then
-    execute immediate 'alter session set plsql_code_type=''native''';
-  end if;
+    if l_native_compilation then
+        execute immediate 'alter session set plsql_code_type=''native''';
+    end if;
 
-  select count(*) into v_count from all_objects where object_type = 'SYNONYM' and object_name = 'APEX_EXPORT';
-  v_apex_installed := case when v_count = 0 then 'FALSE' else 'TRUE' end;
+    select count(*) into l_count from all_objects where object_type = 'SYNONYM' and object_name = 'APEX_EXPORT';
+    l_apex_installed := case when l_count = 0 then 'FALSE' else 'TRUE' end;
 
-  execute immediate 'alter session set plsql_ccflags = '''
-    || 'APEX_INSTALLED:' || v_apex_installed || ','
-    || 'UTILS_PUBLIC:'   || v_utils_public   || '''';
+    execute immediate 'alter session set plsql_ccflags = '''
+        || 'APEX_INSTALLED:' || l_apex_installed || ','
+        || 'UTILS_PUBLIC:'   || l_utils_public   || '''';
 
+    -- select * from all_plsql_object_settings where name = 'MODEL';
 end;
 /
 
-exec dbms_output.put_line( '- Package model (spec)' );
+
+prompt - Package model (spec)
 create or replace package model authid current_user is
 
 c_name    constant varchar2 (30 byte) := 'Oracle Data Model Utilities';
-c_version constant varchar2 (10 byte) := '0.7.3';
+c_version constant varchar2 (10 byte) := '0.9.0';
 c_url     constant varchar2 (34 byte) := 'https://github.com/ogobrecht/model';
 c_license constant varchar2 ( 3 byte) := 'MIT';
 c_author  constant varchar2 (15 byte) := 'Ottmar Gobrecht';
@@ -55,6 +55,44 @@ Oracle Data Model Utilities
 PL/SQL utilities to support data model activities like query/mview
 generation, reporting, visualizations...
 
+Project page https://github.com/ogobrecht/model
+
+**/
+
+type t_vc2_tab is table of varchar2(128);
+
+--------------------------------------------------------------------------------
+
+function base_mviews return t_vc2_tab;
+/**
+
+Returns the base materialized views as defined in the model package.
+
+EXAMPLE
+
+```sql
+declare
+    l_base_mviews model.t_vc2_tab := model.base_mviews;
+begin
+    for i in 1..l_base_mviews.count loop
+        dbms_output.put_line(l_base_mviews(i));
+    end loop;
+end;
+```
+**/
+
+--------------------------------------------------------------------------------
+
+function list_base_mviews return t_vc2_tab pipelined;
+/**
+
+List base materialized views as defined in the model package.
+
+EXAMPLE
+
+```sql
+select * from table (model.list_base_mviews);
+```
 **/
 
 --------------------------------------------------------------------------------
@@ -103,6 +141,82 @@ EXAMPLE
 ```sql
 exec model.drop_mview('USER_TAB_COLUMNS_MV');
 ```
+**/
+
+--------------------------------------------------------------------------------
+
+procedure create_or_refresh_base_mviews;
+
+/**
+
+A convenience procedure which creates or refreshes the base materialized
+views defined in model.g_base_mviews.
+
+EXAMPLES
+
+```sql
+set serveroutput on
+exec model.create_or_refresh_base_mviews;
+```
+
+**/
+
+--------------------------------------------------------------------------------
+
+procedure drop_base_mviews;
+
+/**
+
+A convenience procedure which drops the base materialized views defined in
+model.g_base_mviews.
+
+EXAMPLES
+
+```sql
+set serveroutput on
+exec model.drop_base_mviews;
+```
+
+**/
+
+--------------------------------------------------------------------------------
+
+function all_base_mviews_exist return boolean;
+
+/**
+
+A convenience function which checks for the base materialized views defined
+in model.g_base_mviews.
+
+Returns true, if all base views exist. Otherwise false.
+
+EXAMPLES
+
+```sql
+...
+if model.all_base_mviews_exist then
+    your code here...
+end if;
+...
+```
+
+**/
+
+--------------------------------------------------------------------------------
+
+function last_refresh_base_mviews return date;
+
+/**
+
+A convenience function which returns the minimum last refresh date of the
+base materialized views defined in model.g_base_mviews.
+
+EXAMPLES
+
+```sql
+select model.last_refresh_base_mviews from dual;
+```
+
 **/
 
 --------------------------------------------------------------------------------
@@ -298,12 +412,46 @@ select model.version from dual;
 end model;
 /
 
-exec dbms_output.put_line( '- Package model (body)' );
+
+prompt - Package model (body)
 create or replace package body model is
 
 c_lf            constant char(1)           := chr(10);
 c_error_code    constant pls_integer       := -20777 ;
 c_assert_prefix constant varchar2(30)      := 'Assertion failed: ';
+
+g_base_mviews t_vc2_tab := t_vc2_tab (
+    'ALL_TABLES',
+    'ALL_TAB_COLUMNS',
+    'ALL_CONSTRAINTS',
+    'ALL_CONS_COLUMNS',
+    'ALL_INDEXES',
+    'ALL_IND_COLUMNS',
+    'ALL_OBJECTS',
+    'ALL_DEPENDENCIES',
+    'ALL_VIEWS',
+    'ALL_TRIGGERS',
+    'ALL_SYNONYMS',
+    'USER_TAB_PRIVS',
+    'ALL_RELATIONS' );
+
+--------------------------------------------------------------------------------
+
+function base_mviews return t_vc2_tab
+is
+begin
+    return g_base_mviews;
+end base_mviews;
+
+--------------------------------------------------------------------------------
+
+function list_base_mviews return t_vc2_tab pipelined
+is
+begin
+    for i in 1..g_base_mviews.count loop
+        pipe row(g_base_mviews(i));
+    end loop;
+end list_base_mviews;
 
 --------------------------------------------------------------------------------
 
@@ -371,24 +519,138 @@ begin
 
     select count(*)
       into l_count
-      from user_mviews
+      from sys.user_mviews
      where mview_name = l_mview_name;
 
     if l_count = 1 then
 
-        dbms_mview.refresh (
-            list => l_mview_name,
+        sys.dbms_snapshot.refresh (
+            list   => l_mview_name,
             method => 'c' );
-        dbms_output.put_line (
+        sys.dbms_output.put_line (
             '- ' || runtime(l_start) ||
             ' - materialized view refreshed - ' ||
             l_mview_name );
+
+    elsif p_table_name = 'ALL_RELATIONS' and p_owner = 'SYS' then
+
+        execute immediate q'[
+            create materialized view all_relations_mv as
+            with constraint_not_null_columns as (
+                --> because of primary keys and not null check constraints we have to select distinct here
+                select distinct
+                       owner,
+                       table_name,
+                       column_name,
+                       nullable
+                  from ( select c.owner,
+                                c.table_name,
+                                cc.column_name,
+                                c.constraint_name,
+                                c.constraint_type,
+                                c.search_condition,
+                                'N' as nullable
+                           from all_constraints_mv  c
+                           join all_cons_columns_mv cc
+                             on c.owner           = cc.owner
+                            and c.constraint_name = cc.constraint_name
+                          where c.status = 'ENABLED'
+                                and ( c.constraint_type = 'P'
+                                      or --------------------
+                                      c.constraint_type = 'C'
+                                      and regexp_count( trim(c.search_condition),
+                                                        '^"{0,1}' || cc.column_name || '"{0,1}\s+is\s+not\s+null$',
+                                                        1,
+                                                        'i' ) = 1 ) ) ),
+            table_columns as (
+                select tc.owner,
+                       tc.table_name,
+                       tc.column_name,
+                       tc.data_type,
+                       tc.data_length,
+                       tc.data_precision,
+                       tc.data_scale,
+                       tc.char_length,
+                       tc.char_used,
+                       tc.nullable as nullable_dict, --> dictionary does not recognize table level not null constraints
+                       nvl( nn.nullable, 'Y' ) as nullable_cons
+                  from all_tab_columns_mv                    tc
+                       left join constraint_not_null_columns nn
+                         on tc.owner       = nn.owner
+                        and tc.table_name  = nn.table_name
+                        and tc.column_name = nn.column_name ),
+            relations as (
+                select c.owner,
+                       c.constraint_name,
+                       c.deferrable,
+                       c.status,
+                       c.validated,
+                       cc.table_name,
+                       cc.column_name,
+                       cc.position,
+                       upper(substr(tc.data_type,1,1)) || lower(substr(tc.data_type,2)) ||
+                           case
+                             when tc.data_type in ('CHAR', 'NCHAR', 'VARCHAR2', 'NVARCHAR2') then
+                               ' (' || tc.char_length || case tc.char_used when 'B' then ' byte' when 'C' then ' char' end || ')'
+                             when tc.data_type = 'NUMBER' and tc.data_precision is not null and tc.data_scale is not null then
+                               ' (' || tc.data_precision || ',' || tc.data_scale || ')'
+                           end
+                       as data_type_display,
+                       tc.nullable_dict,
+                       tc.nullable_cons,
+                       r_c.owner           as r_owner,
+                       r_c.constraint_name as r_constraint_name,
+                       r_c.deferrable      as r_deferrable,
+                       r_c.status          as r_status,
+                       r_c.validated       as r_validated,
+                       r_cc.table_name     as r_table_name,
+                       r_cc.column_name    as r_column_name,
+                       r_cc.position       as r_position,
+                       upper(substr(r_tc.data_type,1,1)) || lower(substr(r_tc.data_type,2)) ||
+                           case
+                             when r_tc.data_type in ('CHAR', 'NCHAR', 'VARCHAR2', 'NVARCHAR2') then
+                               ' (' || r_tc.char_length || case r_tc.char_used when 'B' then ' byte' when 'C' then ' char' end || ')'
+                             when r_tc.data_type = 'NUMBER' and r_tc.data_precision is not null and r_tc.data_scale is not null then
+                               ' (' || r_tc.data_precision || ',' || r_tc.data_scale || ')'
+                           end
+                       as r_data_type_display,
+                       r_tc.nullable_dict  as r_nullable_dict,
+                       r_tc.nullable_cons  as r_nullable_cons
+                  from all_constraints_mv c
+                       --
+                  join all_cons_columns_mv cc
+                    on c.owner           = cc.owner
+                   and c.constraint_name = cc.constraint_name
+                       --
+                  left join table_columns tc
+                    on cc.owner       = tc.owner
+                   and cc.table_name  = tc.table_name
+                   and cc.column_name = tc.column_name
+                       --
+                  join all_constraints_mv r_c
+                    on c.r_owner           = r_c.owner
+                   and c.r_constraint_name = r_c.constraint_name
+                       --
+                  join all_cons_columns_mv r_cc
+                    on r_c.owner           = r_cc.owner
+                   and r_c.constraint_name = r_cc.constraint_name
+                       --
+                  left join table_columns r_tc
+                    on r_cc.owner       = r_tc.owner
+                   and r_cc.table_name  = r_tc.table_name
+                   and r_cc.column_name = r_tc.column_name
+                       --
+                 where c.constraint_type = 'R' )
+            select * from relations]';
+
+            create_index(l_mview_name, 'IDX1', 'OWNER,TABLE_NAME');
+            create_index(l_mview_name, 'IDX2', 'R_OWNER,R_TABLE_NAME');
 
     else
 
         select count(*)
           into l_count
-          from all_tab_columns
+          from sys.all_tab_columns
          where owner = p_owner
            and table_name = p_table_name;
 
@@ -399,7 +661,7 @@ begin
         for i in (
             with base as (
               select owner, table_name, column_name, data_type, data_length, column_id
-                from all_tab_columns
+                from sys.all_tab_columns
                where owner = p_owner
                  and table_name = p_table_name )
             select owner,
@@ -480,12 +742,6 @@ begin
             then
                 l_code := l_code || '  c.comments,' || c_lf;
 
-                --l_code := l_code ||
-                --    '  model.get_table_comments ('      || c_lf ||
-                --    '    p_table_name => t.table_name,' || c_lf ||
-                --    '    p_owner      => t.owner )'     || c_lf ||
-                --    '  as comments, '                   || c_lf;
-
                 l_comments(l_comments.count + 1) := r_comments (
                     column_name => 'COMMENTS',
                     comments    => 'Comments on this table or view.' ) ;
@@ -497,13 +753,6 @@ begin
                 and i.column_name = 'DATA_TYPE'
             then
                 l_code := l_code || '  c.comments,' || c_lf;
-
-                --l_code := l_code ||
-                --    '  model.get_column_comments ('       || c_lf ||
-                --    '    p_table_name  => t.table_name,'  || c_lf ||
-                --    '    p_column_name => t.column_name,' || c_lf ||
-                --    '    p_owner       => t.owner )'      || c_lf ||
-                --    '  as comments, '                     || c_lf;
 
                 l_comments(l_comments.count + 1) := r_comments (
                     column_name => 'COMMENTS',
@@ -518,14 +767,6 @@ begin
             then
                 l_code := l_code || '  i.generation_type as identity_generation_type,' || c_lf;
 
-                --l_code := l_code ||
-                --    '  case when identity_column = ''YES'' then' || c_lf ||
-                --    '    model.get_identity_generation_type ('   || c_lf ||
-                --    '    p_table_name  => t.table_name,'         || c_lf ||
-                --    '    p_column_name => t.column_name,'        || c_lf ||
-                --    '    p_owner       => t.owner )'             || c_lf ||
-                --    '  end as identity_generation_type, '        || c_lf;
-
                 l_comments(l_comments.count + 1) := r_comments (
                     column_name => 'IDENTITY_GENERATION_TYPE',
                     comments    => 'Generation type of the identity column. Possible values are ALWAYS or BY DEFAULT.' ) ;
@@ -539,7 +780,7 @@ begin
                 'select'                                              || c_lf ||
                 rtrim(l_code, ',' || c_lf)                            || c_lf ||
                 'from'                                                || c_lf ||
-                '  ' || p_table_name || ' t'                          || c_lf ||
+                '  ' || p_owner || '.' || p_table_name || ' t'        || c_lf ||
                 case when p_owner = 'SYS' and p_table_name in (
                                                 'ALL_TAB_COLUMNS',
                                                 'ALL_TABLES',
@@ -550,27 +791,27 @@ begin
                     '  left join ' ||
                     case p_table_name
                         when 'ALL_TAB_COLUMNS' then
-                            'all_col_comments c'                    || c_lf ||
+                            'sys.all_col_comments c'                || c_lf ||
                             '    on  t.owner       = c.owner'       || c_lf ||
                             '    and t.table_name  = c.table_name'  || c_lf ||
                             '    and t.column_name = c.column_name'
                         when 'ALL_TABLES' then
-                            'all_tab_comments c'                    || c_lf ||
+                            'sys.all_tab_comments c'                || c_lf ||
                             '    on  t.owner      = c.owner'        || c_lf ||
                             '    and t.table_name = c.table_name'
                         when 'ALL_VIEWS' then
-                            'all_tab_comments c'                    || c_lf ||
+                            'sys.all_tab_comments c'                || c_lf ||
                             '    on  t.owner     = c.owner'         || c_lf ||
                             '    and t.view_name = c.table_name'
                         when 'USER_TAB_COLUMNS' then
-                            'user_col_comments c'                   || c_lf ||
+                            'sys.user_col_comments c'               || c_lf ||
                             '    on  t.table_name  = c.table_name'  || c_lf ||
                             '    and t.column_name = c.column_name'
                         when 'USER_TABLES' then
-                            'user_tab_comments c'                   || c_lf ||
+                            'sys.user_tab_comments c'               || c_lf ||
                             '    on t.table_name = c.table_name'
                         when 'USER_VIEWS' then
-                            'user_tab_comments c'                   || c_lf ||
+                            'sys.user_tab_comments c'               || c_lf ||
                             '    on t.view_name = c.table_name'
                     end || c_lf
                 end ||
@@ -580,11 +821,11 @@ begin
                     '  left join ' ||
                     case p_table_name
                         when 'USER_TAB_COLUMNS' then
-                            'user_tab_identity_cols i'              || c_lf ||
+                            'sys.user_tab_identity_cols i'          || c_lf ||
                             '    on  t.table_name  = i.table_name'  || c_lf ||
                             '    and t.column_name = i.column_name'
                         when 'ALL_TAB_COLUMNS' then
-                            'all_tab_identity_cols i'               || c_lf ||
+                            'sys.all_tab_identity_cols i'           || c_lf ||
                             '    on  t.owner       = i.owner'       || c_lf ||
                             '    and t.table_name  = i.table_name'  || c_lf ||
                             '    and t.column_name = i.column_name'
@@ -593,14 +834,14 @@ begin
                 ;
 
             if p_debug then
-                dbms_output.put_line(l_code);
+                sys.dbms_output.put_line(l_code);
             end if;
 
             execute immediate(l_code);
 
             -- copy over table/view comments
             for i in ( select *
-                         from all_tab_comments
+                         from sys.all_tab_comments
                         where owner      = p_owner
                           and table_name = p_table_name )
             loop
@@ -610,7 +851,7 @@ begin
 
             -- copy over column comments
             for i in ( select *
-                         from all_col_comments
+                         from sys.all_col_comments
                         where owner      = p_owner
                           and table_name = p_table_name )
             loop
@@ -628,38 +869,55 @@ begin
             -- add indexes in case of SYS tables
             if p_owner = 'SYS' then
                 case p_table_name
-                    when 'ALL_TABLES'       then
-                        create_index(l_mview_name, 'IDX1', 'OWNER,TABLE_NAME');
-                    when 'ALL_TAB_COLUMNS'  then
-                        create_index(l_mview_name, 'IDX1', 'OWNER,TABLE_NAME,COLUMN_NAME,COLUMN_ID');
-                    when 'ALL_CONSTRAINTS'  then
-                        create_index(l_mview_name, 'IDX1', 'OWNER,CONSTRAINT_NAME,STATUS');
-                        create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME,STATUS');
-                    when 'ALL_CONS_COLUMNS' then
-                        create_index(l_mview_name, 'IDX1', 'OWNER,CONSTRAINT_NAME');
-                        create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME,COLUMN_NAME');
-                    when 'ALL_INDEXES'      then
-                        create_index(l_mview_name, 'IDX1', 'OWNER,INDEX_NAME');
-                        create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME');
-                    when 'ALL_IND_COLUMNS'  then
-                        create_index(l_mview_name, 'IDX1', 'INDEX_OWNER,INDEX_NAME,COLUMN_NAME');
-                    when 'ALL_OBJECTS'      then
-                        create_index(l_mview_name, 'IDX1', 'OWNER,OBJECT_NAME,OBJECT_TYPE');
-                    when 'ALL_DEPENDENCIES' then
-                        create_index(l_mview_name, 'IDX1', 'OWNER,NAME');
-                        create_index(l_mview_name, 'IDX2', 'REFERENCED_OWNER,REFERENCED_NAME');
-                    when 'ALL_VIEWS'        then
-                        create_index(l_mview_name, 'IDX1', 'OWNER,VIEW_NAME');
-                    when 'ALL_TRIGGERS'     then
-                        create_index(l_mview_name, 'IDX1', 'OWNER,TRIGGER_NAME');
-                        create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME');
+                    when 'ALL_TABLES'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'OWNER,TABLE_NAME');
+                    when 'ALL_TAB_COLUMNS'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'OWNER,TABLE_NAME,COLUMN_NAME,COLUMN_ID');
+                    when 'ALL_CONSTRAINTS'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'OWNER,CONSTRAINT_NAME,STATUS');
+                            create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME,STATUS');
+                    when 'ALL_CONS_COLUMNS'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'OWNER,CONSTRAINT_NAME');
+                            create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME,COLUMN_NAME');
+                    when 'ALL_INDEXES'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'OWNER,INDEX_NAME');
+                            create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME');
+                    when 'ALL_IND_COLUMNS'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'INDEX_OWNER,INDEX_NAME,COLUMN_NAME');
+                    when 'ALL_OBJECTS'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'OWNER,OBJECT_NAME,OBJECT_TYPE');
+                    when 'ALL_DEPENDENCIES'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'OWNER,NAME');
+                            create_index(l_mview_name, 'IDX2', 'REFERENCED_OWNER,REFERENCED_NAME');
+                    when 'ALL_VIEWS'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'OWNER,VIEW_NAME');
+                    when 'ALL_TRIGGERS'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'OWNER,TRIGGER_NAME');
+                            create_index(l_mview_name, 'IDX2', 'OWNER,TABLE_NAME');
+                    when 'ALL_SYNONYMS'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'OWNER,SYNONYM_NAME');
+                            create_index(l_mview_name, 'IDX2', 'TABLE_OWNER,TABLE_NAME');
+                    when 'USER_TAB_PRIVS'
+                        then
+                            create_index(l_mview_name, 'IDX1', 'OWNER,TABLE_NAME');
                     else
                         null;
                 end case;
             end if;
         end if;
 
-        dbms_output.put_line (
+        sys.dbms_output.put_line (
             '- ' || runtime(l_start) ||
             ' - materialized view created - ' || l_mview_name);
     end if;
@@ -678,22 +936,78 @@ begin
 
     select count(*)
       into l_count
-      from user_mviews
+      from sys.user_mviews
      where mview_name = p_mview_name;
 
     if l_count = 1 then
         l_sql := 'drop materialized view ' || p_mview_name;
-        dbms_output.put_line (
+        sys.dbms_output.put_line (
             '- ' || runtime(l_start) ||
             ' - materialized view dropped - ' || p_mview_name);
         execute immediate l_sql;
     else
-        dbms_output.put_line (
+        sys.dbms_output.put_line (
             '- ' || runtime(l_start) ||
             ' - materialized view does not exist - ' || p_mview_name);
     end if;
 
 end drop_mview;
+
+--------------------------------------------------------------------------------
+
+procedure create_or_refresh_base_mviews
+is
+begin
+    for i in 1..g_base_mviews.count loop
+        create_or_refresh_mview( g_base_mviews(i), 'SYS' );
+    end loop;
+end create_or_refresh_base_mviews;
+
+--------------------------------------------------------------------------------
+
+procedure drop_base_mviews
+is
+begin
+    for i in 1..g_base_mviews.count loop
+        drop_mview( g_base_mviews(i) || '_MV' );
+    end loop;
+end drop_base_mviews;
+
+--------------------------------------------------------------------------------
+
+function all_base_mviews_exist return boolean
+is
+    l_user_mviews t_vc2_tab;
+    type t_array is table of pls_integer index by varchar2(128);
+    l_array t_array;
+begin
+    select mview_name
+      bulk collect into l_user_mviews
+      from sys.user_mviews;
+    for i in 1..l_user_mviews.count loop
+        l_array(l_user_mviews(i)) := null; -- the value does not matter
+    end loop;
+    for i in 1..g_base_mviews.count loop
+        if not l_array.exists(g_base_mviews(i) || '_MV') then
+            return false;
+        end if;
+    end loop;
+    return true;
+end all_base_mviews_exist;
+
+--------------------------------------------------------------------------------
+
+function last_refresh_base_mviews return date
+is
+    l_last_refresh date;
+begin
+    select min(last_refresh)
+      into l_last_refresh
+      from sys.user_mview_refresh_times
+     where name in (
+        select column_value || '_MV' from table (model.list_base_mviews) );
+    return l_last_refresh;
+end last_refresh_base_mviews;
 
 --------------------------------------------------------------------------------
 
@@ -708,7 +1022,7 @@ begin
     l_ddl := 'create ' || case when p_unique then 'unique ' end ||
         'index ' || p_table_name || '_' || p_postfix || ' on ' ||
         p_table_name || ' (' || p_columns || ')';
-    --dbms_output.put_line ('- ' || l_ddl);
+    --sys.dbms_output.put_line ('- ' || l_ddl);
     execute immediate l_ddl;
 end;
 
@@ -812,7 +1126,7 @@ begin
         when l_dict_tab_name in ('USER_TAB_COLUMNS', 'USER_TAB_COLS') then
             select data_default
               into l_long
-              from user_tab_columns
+              from sys.user_tab_columns
              where table_name  = l_table_name
                and column_name = l_column_name;
         when l_dict_tab_name in ('ALL_TAB_COLUMNS', 'ALL_TAB_COLUMNS') then
@@ -825,7 +1139,7 @@ begin
         when l_dict_tab_name = 'USER_NESTED_TABLE_COLS' then
             select data_default
               into l_long
-              from user_nested_table_cols
+              from sys.user_nested_table_cols
              where table_name  = l_table_name
                and column_name = l_column_name;
         when l_dict_tab_name = 'ALL_NESTED_TABLE_COLS' then
@@ -857,7 +1171,7 @@ begin
     case l_dict_tab_name
         when 'USER_CONSTRAINTS' then
             select search_condition into l_long
-              from user_constraints
+              from sys.user_constraints
              where owner = p_owner
                and constraint_name = l_constraint_name;
         when 'ALL_CONSTRAINTS' then
@@ -887,7 +1201,7 @@ begin
     case l_dict_tab_name
         when 'USER_TRIGGERS' then
             select trigger_body into l_long
-              from user_triggers
+              from sys.user_triggers
              where trigger_name = l_trigger_name;
         when 'ALL_TRIGGERS' then
             select trigger_body into l_long
@@ -990,49 +1304,49 @@ end version;
 
 end model;
 /
+
 -- check for errors in package model
 declare
-  v_count pls_integer;
+  l_count pls_integer;
+  l_name  varchar2(30) := 'MODEL';
 begin
   select count(*)
-    into v_count
+    into l_count
     from user_errors
-   where name = 'MODEL';
-  if v_count > 0 then
-    dbms_output.put_line('- Package MODEL has errors :-(');
+   where name = l_name;
+  if l_count > 0 then
+    dbms_output.put_line('- Package ' || l_name || ' has errors :-(');
+    for i in (
+        select name || case when type like '%BODY' then ' body' end || ', ' ||
+               'line ' || line || ', ' ||
+               'column ' || position || ', ' ||
+               attribute  || ': ' ||
+               text as message
+          from user_errors
+         where name = l_name
+         order by name, line, position )
+    loop
+        dbms_output.put_line('- ' || i.message);
+    end loop;
   end if;
 end;
 /
 
-column "Name"      format a15
-column "Line,Col"  format a10
-column "Type"      format a10
-column "Message"   format a80
-
-select name || case when type like '%BODY' then ' body' end as "Name",
-       line || ',' || position as "Line,Col",
-       attribute               as "Type",
-       text                    as "Message"
-  from user_errors
- where name = 'MODEL'
- order by name, line, position;
 
 declare
-  v_count   pls_integer;
-  v_version varchar2(10 byte);
+  l_count   pls_integer;
+  l_version varchar2(10 byte);
 begin
   select count(*)
-    into v_count
+    into l_count
     from user_errors
    where name = 'MODEL';
-  if v_count = 0 then
+  if l_count = 0 then
     -- without execute immediate this script will raise an error when the package model is not valid
-    execute immediate 'select model.version from dual' into v_version;
-    dbms_output.put_line('- FINISHED (v' || v_version || ')');
+    execute immediate 'select model.version from dual' into l_version;
+    dbms_output.put_line('- Version: ' || l_version);
   end if;
 end;
 /
-prompt
 
-
-
+prompt - FINISHED

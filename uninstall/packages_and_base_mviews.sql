@@ -1,3 +1,5 @@
+prompt UNINSTALL ORACLE DATA MODEL UTILITIES: DROP BASE MATERIALIZED VIEWS
+
 set define on
 set serveroutput on
 set verify off
@@ -7,8 +9,12 @@ set trimout on
 set trimspool on
 whenever sqlerror exit sql.sqlcode rollback
 
-prompt UNINSTALL ORACLE DICTIONARY TOOLS: DROP PACKAGES
-prompt - Existing materialized views will not be dropped
+begin
+    model.drop_base_mviews;
+end;
+/
+
+prompt UNINSTALL ORACLE DATA MODEL UTILITIES: DROP PACKAGES
 
 declare
     v_count        pls_integer;

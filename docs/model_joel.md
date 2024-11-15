@@ -11,6 +11,11 @@ Oracle Data Model Utilities - APEX Extension
 - [Procedure create_interactive_report](#procedure-create_interactive_report)
 - [Function get_overview_counts](#function-get_overview_counts)
 - [Function get_detail_counts](#function-get_detail_counts)
+- [Function get_object_meta](#function-get_object_meta)
+- [Function get_bg_execution_status](#function-get_bg_execution_status)
+- [Function view_missing_fk_indexes](#function-view_missing_fk_indexes)
+- [Procedure create_missing_fk_indexes](#procedure-create_missing_fk_indexes)
+- [Procedure create_or_refresh_base_mviews](#procedure-create_or_refresh_base_mviews)
 
 
 ## Package model_joel
@@ -169,7 +174,7 @@ Create an interactive report with generic columns to show the data of any
 table.
 
 This procedure needs an APEX session to work and the application needs to be
-runtime modifiable. This cn be set under: Shared Components > Security
+runtime modifiable. This can be set under: Shared Components > Security
 Attributes > Runtime API Usage > Check "Modify This Application".
 
 EXAMPLE
@@ -198,7 +203,7 @@ begin
         p_max_cols_varchar       =>  80 ,
         p_max_cols_clob          =>  10 );
 
-    commit; --SEC:OK
+    commit;
 end;
 /
 ```
@@ -225,8 +230,8 @@ procedure create_interactive_report (
 Get the number of tables, views and columns for a schema. Returns JSON as
 varchar2.
 
-Include and exclude filters are case insensitive contains filters - multiple
-search terms can be given separated by spaces.
+p_objects_include and p_objects_exclude are case insensitive contains
+filters. Multiple terms can be given separated by spaces.
 
 EXAMPLE
 
@@ -236,8 +241,7 @@ select model_joel.get_overview_counts (
            p_objects_include => 'coord meta' )
        as overview_counts
   from dual;
-
---> {"TABLES":12,"TABLE_COLUMNS":156,"VIEWS":16,"VIEW_COLUMNS":288}
+```
 
 SIGNATURE
 
@@ -253,27 +257,144 @@ function get_overview_counts (
 
 ## Function get_detail_counts
 
-Get the number of rows, columns, constrints, indexes, and triggers for a
-table or view. Returns JSON as varchar2.
+Get the number of rows, columns, constraints, indexes, triggers and
+dependecies for a table or view. Returns JSON as varchar2.
+
+p_model_exclude_tables is a case insensitive contains filter. Multiple terms
+can be given separated by spaces.
 
 EXAMPLE
 
 ```sql
 select model_joel.get_detail_counts (
-           p_owner        => 'MDSYS',
+           p_owner       => 'MDSYS',
            p_object_name => 'SDO_COORD_OP_PARAM_VALS' )
-       as overview_counts
+       as details_counts
   from dual;
-
---> {"ROWS":15105,"COLUMNS":8,"CONSTRAINTS":5,"INDEXES":1,"TRIGGERS":2}
+```
 
 SIGNATURE
 
 ```sql
 function get_detail_counts (
-    p_owner       in varchar2 default sys_context('USERENV', 'CURRENT_USER') ,
-    p_object_name in varchar2 default null )
+    p_owner                in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+    p_object_name          in varchar2              ,
+    p_model_exclude_tables in varchar2 default null )
     return varchar2;
+```
+
+
+## Function get_object_meta
+
+Get additional meta data for objects in HTML text format, which are not
+already listed by the dictionary views user_tab_columns user_constraints,
+user_indexes, user_triggers and user_dependencies.
+
+EXAMPLE
+
+```sql
+select model_joel.get_object_meta (
+           p_owner       => 'MDSYS',
+           p_object_name => 'SDO_COORD_OP_PARAM_VALS' )
+       as overview_counts
+  from dual;
+```
+
+SIGNATURE
+
+```sql
+function get_object_meta (
+    p_owner       in varchar2 default sys_context('USERENV', 'CURRENT_USER'),
+    p_object_name in varchar2 ,
+    p_object_type in varchar2 default null)
+    return clob;
+```
+
+
+## Function get_bg_execution_status
+
+Get the current status of the background execution for the given id. Returns
+JSON as varchar2.
+
+EXAMPLE
+
+```sql
+select model_joel.get_bg_execution_status (
+           p_execution_id => 12345 )
+       as overview_counts
+  from dual;
+```
+
+SIGNATURE
+
+```sql
+function get_bg_execution_status (
+    p_execution_id in number )
+    return varchar2;
+```
+
+
+## Function view_missing_fk_indexes
+
+Table function which lists the missing foreign key indexes for the given
+schema/owner.
+
+EXAMPLE
+
+```sql
+select * from table (model_joel.view_missing_fk_indexes);
+```
+
+SIGNATURE
+
+```sql
+function view_missing_fk_indexes (
+    p_owner varchar2 default sys_context('USERENV', 'CURRENT_USER') )
+return t_indexes_tab pipelined;
+```
+
+
+## Procedure create_missing_fk_indexes
+
+A convenience procedure which creates missing foreign key indexes and refreshes
+ the 11 base materialized views .
+
+EXAMPLES
+
+```sql
+set serveroutput on
+exec model_joel.create_missing_fk_indexes;
+```
+
+SIGNATURE
+
+```sql
+procedure create_missing_fk_indexes;
+```
+
+
+## Procedure create_or_refresh_base_mviews
+
+A convenience procedure which creates or refreshes the base materialized
+views defined in model.g_base_mviews with updating APEX background execution
+status.
+
+The parameters p_totalwork and p_sofar can be used to overwrite the calculated
+work, when the procedure is called as a subprocedure in a greater context.
+
+EXAMPLES
+
+```sql
+set serveroutput on
+exec model_joel.create_or_refresh_base_mviews;
+```
+
+SIGNATURE
+
+```sql
+procedure create_or_refresh_base_mviews (
+    p_totalwork integer default null,
+    p_sofar     integer default null );
 ```
 
 

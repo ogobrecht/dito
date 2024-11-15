@@ -1,26 +1,26 @@
 -- check for errors in package model
 declare
-  v_count pls_integer;
+  l_count pls_integer;
+  l_name  varchar2(30) := 'MODEL';
 begin
   select count(*)
-    into v_count
+    into l_count
     from user_errors
-   where name = 'MODEL';
-  if v_count > 0 then
-    dbms_output.put_line('- Package MODEL has errors :-(');
+   where name = l_name;
+  if l_count > 0 then
+    dbms_output.put_line('- Package ' || l_name || ' has errors :-(');
+    for i in (
+        select name || case when type like '%BODY' then ' body' end || ', ' ||
+               'line ' || line || ', ' ||
+               'column ' || position || ', ' ||
+               attribute  || ': ' ||
+               text as message
+          from user_errors
+         where name = l_name
+         order by name, line, position )
+    loop
+        dbms_output.put_line('- ' || i.message);
+    end loop;
   end if;
 end;
 /
-
-column "Name"      format a15
-column "Line,Col"  format a10
-column "Type"      format a10
-column "Message"   format a80
-
-select name || case when type like '%BODY' then ' body' end as "Name",
-       line || ',' || position as "Line,Col",
-       attribute               as "Type",
-       text                    as "Message"
-  from user_errors
- where name = 'MODEL'
- order by name, line, position;
