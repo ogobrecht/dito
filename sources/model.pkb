@@ -4,6 +4,29 @@ c_lf            constant char(1)           := chr(10);
 c_error_code    constant pls_integer       := -20777 ;
 c_assert_prefix constant varchar2(30)      := 'Assertion failed: ';
 
+g_base_mviews t_vc2_tab := t_vc2_tab (
+    'ALL_TABLES',
+    'ALL_TAB_COLUMNS',
+    'ALL_CONSTRAINTS',
+    'ALL_CONS_COLUMNS',
+    'ALL_INDEXES',
+    'ALL_IND_COLUMNS',
+    'ALL_OBJECTS',
+    'ALL_DEPENDENCIES',
+    'ALL_VIEWS',
+    'ALL_TRIGGERS',
+    'ALL_SYNONYMS',
+    'USER_TAB_PRIVS',
+    'ALL_RELATIONS' );
+
+--------------------------------------------------------------------------------
+
+function base_mviews return t_vc2_tab
+is
+begin
+    return g_base_mviews;
+end base_mviews;
+
 --------------------------------------------------------------------------------
 
 function list_base_mviews return t_vc2_tab pipelined

@@ -42,7 +42,7 @@ prompt - Package model (spec)
 create or replace package model authid current_user is
 
 c_name    constant varchar2 (30 byte) := 'Oracle Data Model Utilities';
-c_version constant varchar2 (10 byte) := '0.8.0';
+c_version constant varchar2 (10 byte) := '0.9.0';
 c_url     constant varchar2 (34 byte) := 'https://github.com/ogobrecht/model';
 c_license constant varchar2 ( 3 byte) := 'MIT';
 c_author  constant varchar2 (15 byte) := 'Ottmar Gobrecht';
@@ -60,22 +60,40 @@ Project page https://github.com/ogobrecht/model
 **/
 
 type t_vc2_tab is table of varchar2(128);
-g_base_mviews t_vc2_tab := t_vc2_tab (
-    'ALL_TABLES',
-    'ALL_TAB_COLUMNS',
-    'ALL_CONSTRAINTS',
-    'ALL_CONS_COLUMNS',
-    'ALL_INDEXES',
-    'ALL_IND_COLUMNS',
-    'ALL_OBJECTS',
-    'ALL_DEPENDENCIES',
-    'ALL_VIEWS',
-    'ALL_TRIGGERS',
-    'ALL_SYNONYMS',
-    'USER_TAB_PRIVS',
-    'ALL_RELATIONS' );
+
+--------------------------------------------------------------------------------
+
+function base_mviews return t_vc2_tab;
+/**
+
+Returns the base materialized views as defined in the model package.
+
+EXAMPLE
+
+```sql
+declare
+    l_base_mviews model.t_vc2_tab := model.base_mviews;
+begin
+    for i in 1..l_base_mviews.count loop
+        dbms_output.put_line(l_base_mviews(i));
+    end loop;
+end;
+```
+**/
+
+--------------------------------------------------------------------------------
 
 function list_base_mviews return t_vc2_tab pipelined;
+/**
+
+List base materialized views as defined in the model package.
+
+EXAMPLE
+
+```sql
+select * from table (model.list_base_mviews);
+```
+**/
 
 --------------------------------------------------------------------------------
 
@@ -401,6 +419,29 @@ create or replace package body model is
 c_lf            constant char(1)           := chr(10);
 c_error_code    constant pls_integer       := -20777 ;
 c_assert_prefix constant varchar2(30)      := 'Assertion failed: ';
+
+g_base_mviews t_vc2_tab := t_vc2_tab (
+    'ALL_TABLES',
+    'ALL_TAB_COLUMNS',
+    'ALL_CONSTRAINTS',
+    'ALL_CONS_COLUMNS',
+    'ALL_INDEXES',
+    'ALL_IND_COLUMNS',
+    'ALL_OBJECTS',
+    'ALL_DEPENDENCIES',
+    'ALL_VIEWS',
+    'ALL_TRIGGERS',
+    'ALL_SYNONYMS',
+    'USER_TAB_PRIVS',
+    'ALL_RELATIONS' );
+
+--------------------------------------------------------------------------------
+
+function base_mviews return t_vc2_tab
+is
+begin
+    return g_base_mviews;
+end base_mviews;
 
 --------------------------------------------------------------------------------
 
@@ -1267,29 +1308,29 @@ end model;
 -- check for errors in package model
 declare
   l_count pls_integer;
+  l_name  varchar2(30) := 'MODEL';
 begin
   select count(*)
     into l_count
     from user_errors
-   where name = 'MODEL';
+   where name = l_name;
   if l_count > 0 then
-    dbms_output.put_line('- Package MODEL has errors :-(');
+    dbms_output.put_line('- Package ' || l_name || ' has errors :-(');
+    for i in (
+        select name || case when type like '%BODY' then ' body' end || ', ' ||
+               'line ' || line || ', ' ||
+               'column ' || position || ', ' ||
+               attribute  || ': ' ||
+               text as message
+          from user_errors
+         where name = l_name
+         order by name, line, position )
+    loop
+        dbms_output.put_line('- ' || i.message);
+    end loop;
   end if;
 end;
 /
-
-column "Name"      format a15
-column "Line,Col"  format a10
-column "Type"      format a10
-column "Message"   format a80
-
-select name || case when type like '%BODY' then ' body' end as "Name",
-       line || ',' || position as "Line,Col",
-       attribute               as "Type",
-       text                    as "Message"
-  from user_errors
- where name = 'MODEL'
- order by name, line, position;
 
 
 declare
@@ -1303,7 +1344,7 @@ begin
   if l_count = 0 then
     -- without execute immediate this script will raise an error when the package model is not valid
     execute immediate 'select model.version from dual' into l_version;
-    dbms_output.put_line('- FINISHED (v' || l_version || ')');
+    dbms_output.put_line('- Version: ' || l_version);
   end if;
 end;
 /

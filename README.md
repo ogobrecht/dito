@@ -52,6 +52,9 @@ package.
 
 ## Changelog
 
+- 0.9.0 (2024-11-15):
+  - Show errors in anonymous block instead of SQL query
+  - Make base mview array private
 - 0.8.0 (2024-04-05):
   - Handle list of base mviews in model spec
   - Add custom base view: ALL_RELATIONS

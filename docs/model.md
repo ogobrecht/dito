@@ -5,6 +5,8 @@ Oracle Data Model Utilities
 ===========================
 
 - [Package model](#package-model)
+- [Function base_mviews](#function-base_mviews)
+- [Function list_base_mviews](#function-list_base_mviews)
 - [Procedure create_or_refresh_mview](#procedure-create_or_refresh_mview)
 - [Procedure drop_mview](#procedure-drop_mview)
 - [Procedure create_or_refresh_base_mviews](#procedure-create_or_refresh_base_mviews)
@@ -38,10 +40,50 @@ SIGNATURE
 package model authid current_user is
 
 c_name    constant varchar2 (30 byte) := 'Oracle Data Model Utilities';
-c_version constant varchar2 (10 byte) := '0.8.0';
+c_version constant varchar2 (10 byte) := '0.9.0';
 c_url     constant varchar2 (34 byte) := 'https://github.com/ogobrecht/model';
 c_license constant varchar2 ( 3 byte) := 'MIT';
 c_author  constant varchar2 (15 byte) := 'Ottmar Gobrecht';
+```
+
+
+## Function base_mviews
+
+Returns the base materialized views as defined in the model package.
+
+EXAMPLE
+
+```sql
+declare
+    l_base_mviews model.t_vc2_tab := model.base_mviews;
+begin
+    for i in 1..l_base_mviews.count loop
+        dbms_output.put_line(l_base_mviews(i));
+    end loop;
+end;
+```
+
+SIGNATURE
+
+```sql
+function base_mviews return t_vc2_tab;
+```
+
+
+## Function list_base_mviews
+
+List base materialized views as defined in the model package.
+
+EXAMPLE
+
+```sql
+select * from table (model.list_base_mviews);
+```
+
+SIGNATURE
+
+```sql
+function list_base_mviews return t_vc2_tab pipelined;
 ```
 
 

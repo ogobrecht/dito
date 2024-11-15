@@ -1598,6 +1598,7 @@ procedure create_missing_fk_indexes
 is
     l_totalwork       pls_integer;
     l_missing_indexes t_indexes_tab;
+    l_base_mviews     model.t_vc2_tab := model.base_mviews;
 begin
     select * bulk collect into l_missing_indexes
       from table (model_joel.view_missing_fk_indexes);
@@ -1612,7 +1613,7 @@ begin
 
     else
 
-        l_totalwork := l_missing_indexes.count + model.g_base_mviews.count;
+        l_totalwork := l_missing_indexes.count + l_base_mviews.count;
         apex_background_process.set_progress(
             p_totalwork => l_totalwork,
             p_sofar     => 0 );
@@ -1641,18 +1642,19 @@ procedure create_or_refresh_base_mviews (
     p_totalwork integer default null,
     p_sofar     integer default null )
 is
-    l_totalwork pls_integer := coalesce(p_totalwork, model.g_base_mviews.count);
-    l_sofar     pls_integer := coalesce(p_sofar    , 0);
+    l_base_mviews model.t_vc2_tab := model.base_mviews;
+    l_totalwork   pls_integer := coalesce(p_totalwork, l_base_mviews.count);
+    l_sofar       pls_integer := coalesce(p_sofar    , 0);
 begin
     apex_background_process.set_progress(
         p_totalwork => l_totalwork,
         p_sofar     => l_sofar );
 
-    for i in 1..model.g_base_mviews.count loop
+    for i in 1..l_base_mviews.count loop
         apex_background_process.set_status(
-            p_message => 'Refreshing ' || model.g_base_mviews(i) || '_MV' );
+            p_message => 'Refreshing ' || l_base_mviews(i) || '_MV' );
 
-        model.create_or_refresh_mview( model.g_base_mviews(i), 'SYS' );
+        model.create_or_refresh_mview( l_base_mviews(i), 'SYS' );
 
         apex_background_process.set_progress(
             p_totalwork => l_totalwork,
@@ -1669,29 +1671,29 @@ end model_joel;
 -- check for errors in package model_joel
 declare
   l_count pls_integer;
+  l_name  varchar2(30) := 'MODEL_JOEL';
 begin
   select count(*)
     into l_count
     from user_errors
-   where name = 'MODEL_JOEL';
+   where name = l_name;
   if l_count > 0 then
-    dbms_output.put_line('- Package MODEL_JOEL has errors :-(');
+    dbms_output.put_line('- Package ' || l_name || ' has errors :-(');
+    for i in (
+        select name || case when type like '%BODY' then ' body' end || ', ' ||
+               'line ' || line || ', ' ||
+               'column ' || position || ', ' ||
+               attribute  || ': ' ||
+               text as message
+          from user_errors
+         where name = l_name
+         order by name, line, position )
+    loop
+        dbms_output.put_line('- ' || i.message);
+    end loop;
   end if;
 end;
 /
-
-column "Name"      format a15
-column "Line,Col"  format a10
-column "Type"      format a10
-column "Message"   format a80
-
-select name || case when type like '%BODY' then ' body' end as "Name",
-       line || ',' || position as "Line,Col",
-       attribute               as "Type",
-       text                    as "Message"
-  from user_errors
- where name = 'MODEL_JOEL'
- order by name, line, position;
 
 
 prompt - FINISHED
