@@ -9,9 +9,13 @@ set trimout on
 set trimspool on
 whenever sqlerror exit sql.sqlcode rollback
 
-prompt - Create or refresh needed mviews
+prompt - Create or refresh needed mviews (this can take a minute or so...)
 begin
-    model.create_or_refresh_base_mviews;
+    if model.all_base_mviews_exist then
+        dbms_output.put_line('- Mviews already existing - nothing to do');
+    else
+        model.create_or_refresh_base_mviews;
+    end if;
 end;
 /
 
