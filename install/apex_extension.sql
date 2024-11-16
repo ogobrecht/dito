@@ -9,9 +9,13 @@ set trimout on
 set trimspool on
 whenever sqlerror exit sql.sqlcode rollback
 
-prompt - Create or refresh needed mviews
+prompt - Create or refresh needed mviews (this can take a minute or so...)
 begin
-    model.create_or_refresh_base_mviews;
+    if model.all_base_mviews_exist then
+        dbms_output.put_line('- Mviews already existing - nothing to do');
+    else
+        model.create_or_refresh_base_mviews;
+    end if;
 end;
 /
 
@@ -19,7 +23,7 @@ prompt - Set compiler flags
 declare
     l_apex_installed     varchar2(5) := 'FALSE'; -- Do not change (is set dynamically).
     l_utils_public       varchar2(5) := 'FALSE'; -- Make utilities public available (for testing or other usages).
-    l_native_compilation boolean     := false;   -- Set this to true on your own risk (in the Oracle cloud you will get likely an "insufficient privileges" error)
+    l_native_compilation boolean     := false;   -- Set this to true at your own risk (in the Oracle cloud you will get likely an "insufficient privileges" error)
     l_count pls_integer;
 begin
 

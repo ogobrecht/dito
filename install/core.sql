@@ -14,7 +14,7 @@ prompt - Set compiler flags
 declare
     l_apex_installed     varchar2(5) := 'FALSE'; -- Do not change (is set dynamically).
     l_utils_public       varchar2(5) := 'FALSE'; -- Make utilities public available (for testing or other usages).
-    l_native_compilation boolean     := false;   -- Set this to true on your own risk (in the Oracle cloud you will get likely an "insufficient privileges" error)
+    l_native_compilation boolean     := false;   -- Set this to true at your own risk (in the Oracle cloud you will get likely an "insufficient privileges" error)
     l_count pls_integer;
 begin
 
@@ -42,7 +42,7 @@ prompt - Package model (spec)
 create or replace package model authid current_user is
 
 c_name    constant varchar2 (30 byte) := 'Oracle Data Model Utilities';
-c_version constant varchar2 (10 byte) := '0.9.0';
+c_version constant varchar2 (10 byte) := '0.9.1';
 c_url     constant varchar2 (34 byte) := 'https://github.com/ogobrecht/model';
 c_license constant varchar2 ( 3 byte) := 'MIT';
 c_author  constant varchar2 (15 byte) := 'Ottmar Gobrecht';
